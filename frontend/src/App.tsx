@@ -356,13 +356,22 @@ const AppInner: React.FC = () => {
           <div className="flex items-center gap-2 shrink-0">
             <span className="text-2xl">🤿</span>
             <span className="text-sm font-bold text-gray-400 hidden sm:block">Dashboard Plongée</span>
+            {/* Mobile search trigger — icon only */}
+            <button
+              type="button"
+              className="sm:hidden p-1.5 rounded-lg bg-ocean-500 hover:bg-ocean-400 transition-colors"
+              onClick={() => { setMobileSearchOpen(true); setSearchQuery(''); setSuggestions([]); setTimeout(() => mobileInputRef.current?.focus(), 100); }}
+              aria-label="Rechercher un lieu"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            </button>
           </div>
 
           {/* Location display + search */}
           <div className="flex-1 min-w-0" ref={searchContainerRef}>
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00b4d8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-              <h1 className="text-lg font-bold text-ocean-400 leading-tight truncate">{location.name}</h1>
+              <h1 className="text-lg font-bold text-ocean-400 leading-tight truncate max-w-[200px] sm:max-w-none">{location.name}</h1>
               {/* Star button */}
               <button
                 type="button"
@@ -453,15 +462,6 @@ const AppInner: React.FC = () => {
               )}
             </div>
 
-            {/* Mobile search button — visible only on small screens */}
-            <button
-              type="button"
-              className="sm:hidden btn-primary flex items-center gap-1.5 text-sm px-3 py-1.5 h-8 shrink-0"
-              onClick={() => { setMobileSearchOpen(true); setSearchQuery(''); setSuggestions([]); setTimeout(() => mobileInputRef.current?.focus(), 100); }}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-              Changer de lieu
-            </button>
           </div>
 
           {/* Units + theme + clock */}

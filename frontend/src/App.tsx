@@ -205,8 +205,10 @@ const AppInner: React.FC = () => {
   const [searching, setSearching] = React.useState(false);
   const [suggestions, setSuggestions] = React.useState<GeoSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = React.useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = React.useState(false);
   const searchDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchContainerRef = React.useRef<HTMLDivElement>(null);
+  const mobileInputRef = React.useRef<HTMLInputElement>(null);
   const [favorites, setFavorites] = React.useState<FavoriteLocation[]>(loadFavorites);
 
   React.useEffect(() => {
@@ -401,7 +403,8 @@ const AppInner: React.FC = () => {
                 })}
               </div>
             )}
-            <div className="relative">
+            {/* Desktop search — hidden on mobile */}
+            <div className="relative hidden sm:block">
               <form onSubmit={handleLocationSearch} className="flex gap-1.5">
                 <input
                   type="text"
@@ -429,7 +432,7 @@ const AppInner: React.FC = () => {
                 )}
               </form>
 
-              {/* Autocomplete dropdown */}
+              {/* Autocomplete dropdown desktop */}
               {showSuggestions && suggestions.length > 0 && (
                 <ul className="absolute top-full left-0 right-0 mt-0.5 bg-navy-800 border border-navy-600 rounded-lg shadow-xl z-[200] overflow-hidden">
                   {suggestions.map((s) => (
@@ -449,6 +452,16 @@ const AppInner: React.FC = () => {
                 </ul>
               )}
             </div>
+
+            {/* Mobile search button — visible only on small screens */}
+            <button
+              type="button"
+              className="sm:hidden btn-primary flex items-center gap-1.5 text-sm px-3 py-1.5 h-8 shrink-0"
+              onClick={() => { setMobileSearchOpen(true); setSearchQuery(''); setSuggestions([]); setTimeout(() => mobileInputRef.current?.focus(), 100); }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              Changer de lieu
+            </button>
           </div>
 
           {/* Units + theme + clock */}
@@ -689,6 +702,99 @@ const AppInner: React.FC = () => {
       <footer className="text-center py-6 text-gray-600 text-xs">
         Dashboard Plongée — Ouistreham, Normandie &nbsp;•&nbsp; Données: Open-Meteo, prédiction harmonique SHOM
       </footer>
+
+      {/* Mobile search modal */}
+      {mobileSearchOpen && (
+        <div className="fixed inset-0 z-[500] flex flex-col bg-navy-900 sm:hidden">
+          {/* Top bar */}
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-navy-700 bg-navy-800">
+            <form
+              onSubmit={(e) => { handleLocationSearch(e); setMobileSearchOpen(false); }}
+              className="flex-1 flex items-center gap-2 bg-navy-700 rounded-xl px-3 py-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <input
+                ref={mobileInputRef}
+                type="text"
+                placeholder="Rechercher une ville… (ex. Granville)"
+                value={searchQuery}
+                onChange={(e) => handleSearchInput(e.target.value)}
+                onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                className="flex-1 bg-transparent outline-none text-base text-white placeholder-gray-500"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => { setSearchQuery(''); setSuggestions([]); mobileInputRef.current?.focus(); }}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              )}
+            </form>
+            <button
+              type="button"
+              onClick={() => { setMobileSearchOpen(false); setSearchQuery(''); setSuggestions([]); }}
+              className="text-ocean-400 text-sm font-medium shrink-0"
+            >
+              Annuler
+            </button>
+          </div>
+
+          {/* Suggestions list */}
+          <div className="flex-1 overflow-y-auto">
+            {searching && (
+              <div className="flex items-center justify-center py-8 text-gray-500 text-sm">
+                Recherche en cours…
+              </div>
+            )}
+            {!searching && suggestions.length > 0 && (
+              <ul className="divide-y divide-navy-700/50">
+                {suggestions.map((s) => (
+                  <li key={s.id}>
+                    <button
+                      type="button"
+                      className="w-full text-left px-5 py-4 flex items-center gap-3 active:bg-navy-700 transition-colors"
+                      onPointerDown={(e) => { e.preventDefault(); handleSelectSuggestion(s); setMobileSearchOpen(false); }}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00b4d8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                      <div>
+                        <div className="text-white font-medium text-base">{s.name}</div>
+                        {s.displayName !== s.name && (
+                          <div className="text-gray-400 text-sm mt-0.5">{s.displayName.slice(s.name.length).replace(/^,\s*/, '')}</div>
+                        )}
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {!searching && searchQuery.length > 1 && suggestions.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-10 text-gray-500 text-sm gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                Aucun résultat pour « {searchQuery} »
+              </div>
+            )}
+            {!searching && searchQuery.length === 0 && location.name !== DEFAULT_LOCATION.name && (
+              <div className="px-4 pt-4">
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-2 px-1">Lieu actuel</p>
+                <button
+                  type="button"
+                  className="w-full text-left px-4 py-3 flex items-center gap-3 rounded-xl bg-navy-800 active:bg-navy-700"
+                  onClick={() => { setLocation(DEFAULT_LOCATION); setSearchQuery(''); setSuggestions([]); setMobileSearchOpen(false); }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                  <span className="text-white">Retour à {DEFAULT_LOCATION.name}</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
     </SiteAdjustmentProvider>
   );

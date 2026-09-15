@@ -5,67 +5,7 @@ import { useUnits } from '../contexts/UnitContext';
 import { useSiteAdjustment, getSiteMultipliers } from '../contexts/SiteAdjustmentContext';
 import InfoTooltip from './InfoTooltip';
 import { forecastReliability } from '../utils/forecastReliability';
-
-/**
- * CONFIGURATION DU SCORING — modifier ici pour ajuster les seuils
- * Total max : 100 pts (vent 25 + vagues 30 + clarté 20 + temp 10 + courant 15)
- */
-const DIVABILITY_CONFIG = {
-  wind: {
-    maxPts: 25,
-    thresholds: [
-      { below: 8,  pts: 25 },
-      { below: 12, pts: 20 },
-      { below: 15, pts: 10 },
-      { below: 20, pts: 5  },
-    ],
-  },
-  waves: {
-    maxPts: 30,
-    thresholds: [
-      { below: 0.3, pts: 30 },
-      { below: 0.5, pts: 25 },
-      { below: 0.8, pts: 18 },
-      { below: 1.2, pts: 10 },
-      { below: 1.5, pts: 4  },
-    ],
-  },
-  clarity: {
-    maxPts: 20,
-    thresholds: [
-      { below: 0.01, pts: 20 },
-      { below: 0.5,  pts: 15 },
-      { below: 2,    pts: 8  },
-      { below: 5,    pts: 3  },
-    ],
-  },
-  temperature: {
-    maxPts: 10,
-    thresholds: [
-      { below: 999, pts: 10, above: 16 },
-      { below: 16,  pts: 8,  above: 12 },
-      { below: 12,  pts: 6,  above: 10 },
-      { below: 10,  pts: 4,  above: 8  },
-    ],
-    fallback: 2,
-  },
-  current: {
-    maxPts: 15,
-    thresholds: [
-      { below: 0.3, pts: 15 },
-      { below: 0.6, pts: 12 },
-      { below: 1.0, pts: 7  },
-      { below: 1.5, pts: 3  },
-    ],
-  },
-};
-
-function scoreFromThresholds(value: number, thresholds: { below: number; pts: number }[]): number {
-  for (const t of thresholds) {
-    if (value < t.below) return t.pts;
-  }
-  return 0;
-}
+import { computeDivability, type DivabilityResult } from '../utils/scoring';
 
 interface WeatherData {
   current: {
@@ -109,60 +49,7 @@ interface TidalImpact {
   risingTide: boolean;
 }
 
-interface DivabilityScore {
-  total: number;
-  verdict: string;
-  verdictColor: string;
-  details: { label: string; value: string; score: number; maxPts: number; note?: string }[];
-}
-
-function computeDivability(
-  windKnots: number,
-  waveHeight: number,
-  precipitation: number,
-  seaTemp: number,
-  currentMs: number,
-  formatWind: (kt: number) => string = (kt) => `${Math.round(kt)} kt`,
-  formatTemp: (c: number) => string = (c) => `${Math.round(c)}°C`,
-  multipliers: { wind: number; swell: number; current: number } = { wind: 1, swell: 1, current: 1 },
-): DivabilityScore {
-  const cfg = DIVABILITY_CONFIG;
-
-  const windScore = scoreFromThresholds(windKnots / multipliers.wind, cfg.wind.thresholds);
-  const waveScore = scoreFromThresholds(waveHeight / multipliers.swell, cfg.waves.thresholds);
-  const clarityScore = scoreFromThresholds(precipitation, cfg.clarity.thresholds);
-
-  let tempScore = cfg.temperature.fallback;
-  if (seaTemp >= 16) tempScore = 10;
-  else if (seaTemp >= 12) tempScore = 8;
-  else if (seaTemp >= 10) tempScore = 6;
-  else if (seaTemp >= 8) tempScore = 4;
-
-  const currentScore = scoreFromThresholds(currentMs / multipliers.current, cfg.current.thresholds);
-
-  const total = windScore + waveScore + clarityScore + tempScore + currentScore;
-
-  let verdict = '';
-  let verdictColor = '';
-  if (total >= 80) { verdict = 'Excellente'; verdictColor = '#2dd4bf'; }
-  else if (total >= 60) { verdict = 'Bonne'; verdictColor = '#2dd4bf'; }
-  else if (total >= 40) { verdict = 'Moyenne'; verdictColor = '#f59e0b'; }
-  else if (total >= 20) { verdict = 'Déconseillée'; verdictColor = '#ef4444'; }
-  else { verdict = 'Annulée'; verdictColor = '#991b1b'; }
-
-  return {
-    total,
-    verdict,
-    verdictColor,
-    details: [
-      { label: 'Vent', value: formatWind(windKnots), score: windScore, maxPts: cfg.wind.maxPts },
-      { label: 'Vagues', value: `${waveHeight.toFixed(1)} m`, score: waveScore, maxPts: cfg.waves.maxPts },
-      { label: 'Clarté estimée', value: precipitation < 0.01 ? 'Favorable' : `${precipitation.toFixed(1)} mm/h`, score: clarityScore, maxPts: cfg.clarity.maxPts, note: 'proxy précip. surface — ≠ visibilité sous-marine' },
-      { label: 'Temp. mer', value: formatTemp(seaTemp), score: tempScore, maxPts: cfg.temperature.maxPts },
-      { label: 'Courant', value: `${(currentMs * 1.944).toFixed(1)} kt`, score: currentScore, maxPts: cfg.current.maxPts },
-    ],
-  };
-}
+type DivabilityScore = DivabilityResult & { total: number };
 
 interface Props {
   selectedDate: string; // "YYYY-MM-DD" ou "" pour aujourd'hui
@@ -234,8 +121,11 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
       currentMs = weather.marine.hourly.ocean_current_velocity[i] || 0;
     }
 
-    const computed = computeDivability(windKnots, waveHeight, precipitation, seaTemp, currentMs, formatWind, formatTemp, multipliers);
-    setScore(computed);
+    const result = computeDivability(
+      { windKnots, waveHeight, precipitation, seaTemp, currentMs },
+      { multipliers, formatWind, formatTemp },
+    );
+    setScore({ ...result, total: result.score });
   }, [weather, tidalImpact, selectedDate, multipliers]);
 
   const dayIndex = React.useMemo(() => {
@@ -251,7 +141,7 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
     ? new Date((selectedDate || new Date().toISOString().slice(0, 10)) + 'T12:00:00') > new Date(marineHorizonDate)
     : false;
 
-  const gaugePercentage = score ? score.total : 0;
+  const gaugePercentage = score ? score.score : 0;
   const circumference = 2 * Math.PI * 54;
   const strokeDashoffset = circumference - (gaugePercentage / 100) * circumference;
 
@@ -343,7 +233,7 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
                 style={{ transition: 'stroke-dashoffset 0.6s ease, stroke 0.3s ease' }}
               />
               <text x="70" y="62" textAnchor="middle" className="gauge-score-text" fill="white" fontSize="28" fontWeight="bold">
-                {score.total}
+                {score.score}
               </text>
               <text x="70" y="80" textAnchor="middle" className="gauge-sub-text" fill="#9ca3af" fontSize="11">
                 /100

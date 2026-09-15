@@ -2,6 +2,7 @@ import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 import InfoTooltip from './InfoTooltip';
 import { useUnits } from '../contexts/UnitContext';
+import { computeDivability } from '../utils/scoring';
 
 /**
  * ALGORITHME DE DÉCISION — Meilleure fenêtre de plongée du jour
@@ -68,8 +69,15 @@ interface EtaleWindow {
   windowEnd: Date;
   wind: number;
   waves: number;
+  precipitation: number;
+  seaTemp: number;
+  currentMs: number;
   isDaylight: boolean;
-  score: number;
+  /** Score de classement : indice de plongeabilité + bonus diurne (+10 si fenêtre en plein jour). */
+  rankingScore: number;
+  verdict: string;
+  verdictColor: string;
+  divabilityScore: number;
 }
 
 function getHourlyValue(times: string[], values: number[], target: Date): number {
@@ -78,22 +86,6 @@ function getHourlyValue(times: string[], values: number[], target: Date): number
   return idx >= 0 ? (values[idx] ?? 0) : 0;
 }
 
-function computeWindScore(kt: number): number {
-  if (kt < 8) return 25;
-  if (kt < 12) return 20;
-  if (kt < 15) return 10;
-  if (kt < 20) return 5;
-  return 0;
-}
-
-function computeWaveScore(m: number): number {
-  if (m < 0.3) return 30;
-  if (m < 0.5) return 25;
-  if (m < 0.8) return 18;
-  if (m < 1.2) return 10;
-  if (m < 1.5) return 4;
-  return 0;
-}
 
 function formatTime(d: Date): string {
   return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
@@ -102,45 +94,60 @@ function formatTime(d: Date): string {
 function computeEtaleWindows(
   extremes: TideExtreme[],
   weather: WeatherData,
-  dayIndex: number
+  dayIndex: number,
 ): EtaleWindow[] {
   const sunrise = new Date(weather.daily.sunrise[dayIndex] ?? weather.daily.sunrise[0]);
-  const sunset = new Date(weather.daily.sunset[dayIndex] ?? weather.daily.sunset[0]);
+  const sunset  = new Date(weather.daily.sunset[dayIndex]  ?? weather.daily.sunset[0]);
   const ETALE_MARGIN_MS = 45 * 60 * 1000;
 
   return extremes.map((ext) => {
-    const t = new Date(ext.time);
+    const t           = new Date(ext.time);
     const windowStart = new Date(t.getTime() - ETALE_MARGIN_MS);
-    const windowEnd = new Date(t.getTime() + ETALE_MARGIN_MS);
+    const windowEnd   = new Date(t.getTime() + ETALE_MARGIN_MS);
 
-    const wind = getHourlyValue(weather.hourly.time, weather.hourly.windspeed_10m, t);
-    const waves = getHourlyValue(weather.marine.hourly.time, weather.marine.hourly.wave_height, t);
-    const currentMs = getHourlyValue(weather.marine.hourly.time, weather.marine.hourly.ocean_current_velocity ?? [], t);
-    const isDaylight = windowStart >= sunrise && windowEnd <= sunset;
+    const wind          = getHourlyValue(weather.hourly.time,        weather.hourly.windspeed_10m,                  t);
+    const precipitation = getHourlyValue(weather.hourly.time,        weather.hourly.precipitation,                  t);
+    const waves         = getHourlyValue(weather.marine.hourly.time, weather.marine.hourly.wave_height,             t);
+    const currentMs     = getHourlyValue(weather.marine.hourly.time, weather.marine.hourly.ocean_current_velocity ?? [], t);
+    const isDaylight    = windowStart >= sunrise && windowEnd <= sunset;
 
-    // Score : vent + vagues + bonus diurne + bonus courant faible à l'étale
-    const currentBonus = currentMs < 0.3 ? 10 : currentMs < 0.6 ? 5 : 0;
-    const score = computeWindScore(wind) + computeWaveScore(waves) + (isDaylight ? 10 : 0) + currentBonus;
+    // Le verdict est calculé par le module de scoring unifié (même logique que la jauge).
+    const result = computeDivability({
+      windKnots: wind,
+      waveHeight: waves,
+      precipitation,
+      seaTemp: 12, // température non disponible à l'heure de l'étale dans cette interface — valeur neutre
+      currentMs,
+    });
+
+    // Le classement des créneaux ajoute un bonus diurne pour favoriser les plongées de jour,
+    // sans que ce bonus n'affecte le verdict affiché.
+    const rankingScore = result.score + (isDaylight ? 10 : 0);
 
     return {
-      extremeType: ext.type,
-      extremeTime: t,
-      extremeHeight: ext.height,
+      extremeType:     ext.type,
+      extremeTime:     t,
+      extremeHeight:   ext.height,
       windowStart,
       windowEnd,
       wind,
       waves,
+      precipitation,
+      seaTemp:         12,
+      currentMs,
       isDaylight,
-      score,
+      rankingScore,
+      verdict:         result.verdict,
+      verdictColor:    result.verdictColor,
+      divabilityScore: result.score,
     };
   });
 }
 
-function qualityLabel(score: number): { label: string; color: string; bg: string } {
-  if (score >= 55) return { label: 'Excellente', color: '#2dd4bf', bg: 'bg-teal-900/30 border-teal-600/40' };
-  if (score >= 40) return { label: 'Bonne', color: '#2dd4bf', bg: 'bg-teal-900/30 border-teal-600/40' };
-  if (score >= 25) return { label: 'Moyenne', color: '#f59e0b', bg: 'bg-amber-900/30 border-amber-600/40' };
-  return { label: 'Difficile', color: '#ef4444', bg: 'bg-red-900/30 border-red-600/40' };
+function qualityBg(verdictColor: string): string {
+  if (verdictColor === '#2dd4bf') return 'bg-teal-900/30 border-teal-600/40';
+  if (verdictColor === '#f59e0b') return 'bg-amber-900/30 border-amber-600/40';
+  return 'bg-red-900/30 border-red-600/40';
 }
 
 interface Props {
@@ -172,12 +179,10 @@ const DiveDecisionBanner: React.FC<Props> = ({ selectedDay, tideData, weather, m
   }
 
   const windows = computeEtaleWindows(day.extremes, weather, selectedDay);
-  const best = windows.length > 0 ? windows.reduce((a, b) => (b.score > a.score ? b : a)) : null;
-
-  const quality = best ? qualityLabel(best.score) : null;
+  const best    = windows.length > 0 ? windows.reduce((a, b) => (b.rankingScore > a.rankingScore ? b : a)) : null;
 
   return (
-    <div className={`rounded-xl border p-3 ${quality?.bg ?? 'bg-navy-800 border-navy-600'}`}>
+    <div className={`rounded-xl border p-3 ${best ? qualityBg(best.verdictColor) : 'bg-navy-800 border-navy-600'}`}>
       <div className="flex flex-col gap-2">
 
         {/* Best window */}
@@ -196,9 +201,9 @@ const DiveDecisionBanner: React.FC<Props> = ({ selectedDay, tideData, weather, m
               </span>
               <span
                 className="text-sm font-semibold px-2 py-0.5 rounded-full"
-                style={{ color: quality?.color, backgroundColor: quality?.color + '22' }}
+                style={{ color: best.verdictColor, backgroundColor: best.verdictColor + '22' }}
               >
-                {quality?.label}
+                {best.verdict}
               </span>
             </div>
             <p className="text-xs text-gray-400">
@@ -217,7 +222,6 @@ const DiveDecisionBanner: React.FC<Props> = ({ selectedDay, tideData, weather, m
         {/* Compact étale list */}
         <div className="flex flex-col gap-1 mt-2">
           {windows.map((w, i) => {
-            const q = qualityLabel(w.score);
             const isBest = best === w;
             return (
               <div
@@ -233,7 +237,7 @@ const DiveDecisionBanner: React.FC<Props> = ({ selectedDay, tideData, weather, m
                 <span className="text-gray-600 shrink-0">{formatTime(w.windowStart)}–{formatTime(w.windowEnd)}</span>
                 <span className="shrink-0 text-gray-500">{formatWind(w.wind)} · {w.waves.toFixed(1)} m</span>
                 {!w.isDaylight && <span className="text-xs text-amber-500 shrink-0">🌙</span>}
-                <span className="ml-auto font-semibold shrink-0" style={{ color: q.color }}>{q.label}</span>
+                <span className="ml-auto font-semibold shrink-0" style={{ color: w.verdictColor }}>{w.verdict}</span>
               </div>
             );
           })}

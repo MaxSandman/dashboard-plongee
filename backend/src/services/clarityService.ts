@@ -17,6 +17,8 @@
 
 import axios from 'axios';
 import NodeCache from 'node-cache';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 const cache = new NodeCache({ stdTTL: 3600 }); // cache 1h pour Hub'Eau
 
@@ -148,6 +150,26 @@ function exponentialSmooth(values: number[], dtH: number, tauH: number): number 
 
 // ── Interface publique ────────────────────────────────────────────────────────
 
+// ── Copernicus satellite (lecture du fichier data/copernicus.json) ────────────
+
+interface CopernicusData {
+  date: string;
+  kd490: number;
+  zsd: number;
+  visibilityM: number;
+  daysBack: number;
+}
+
+function readCopernicusFile(): CopernicusData | null {
+  try {
+    const dataDir = process.env.DATA_DIR ?? join(process.cwd(), '..', 'data');
+    const raw = readFileSync(join(dataDir, 'copernicus.json'), 'utf-8');
+    return JSON.parse(raw) as CopernicusData;
+  } catch {
+    return null;
+  }
+}
+
 export interface ClarityResult {
   kdTotal:      number;
   kdBaseline:   number;
@@ -157,6 +179,7 @@ export interface ClarityResult {
   visibilityM:  number;
   confidence:   'high' | 'medium' | 'low';
   orneDebitM3s: number | null;
+  copernicus: CopernicusData | null;
 }
 
 /**
@@ -193,17 +216,28 @@ export async function computeClarity(
   const kdTotal    = KD_BASELINE + kdRiver + kdWave + kdPlancton;
   const visibilityM = 2.04 / kdTotal;
 
-  const confidence: ClarityResult['confidence'] = orneDebit !== null ? 'high' : 'low';
+  // Copernicus : si disponible, remplace la somme baseline+plancton par kd490 satellite
+  const copernicus = readCopernicusFile();
+  let finalKd = kdTotal;
+  if (copernicus && copernicus.kd490 > 0) {
+    // kd490 satellite = baseline + plancton déjà intégrés → on substitue
+    finalKd = copernicus.kd490 + kdRiver + kdWave;
+  }
+  const finalVisibility = 2.04 / finalKd;
+
+  const confidence: ClarityResult['confidence'] =
+    copernicus ? 'high' : orneDebit !== null ? 'medium' : 'low';
 
   const result: ClarityResult = {
-    kdTotal,
-    kdBaseline: KD_BASELINE,
+    kdTotal:      finalKd,
+    kdBaseline:   KD_BASELINE,
     kdRiver,
     kdWave,
     kdPlancton,
-    visibilityM,
+    visibilityM:  finalVisibility,
     confidence,
     orneDebitM3s: orneDebit,
+    copernicus,
   };
 
   cache.set(cacheKey, result, 3600);

@@ -1,5 +1,7 @@
 import axios from 'axios';
 import NodeCache from 'node-cache';
+import { computeClarity, type ClarityResult } from './clarityService';
+import { computeDayLight, type DayLightSummary } from './lightModel';
 
 const cache = new NodeCache({ stdTTL: 600 });
 
@@ -27,6 +29,7 @@ export interface WeatherData {
     visibility: number[];
     surface_pressure: number[];
     uv_index: number[];
+    shortwave_radiation?: number[];
   };
   marine: {
     hourly: {
@@ -60,6 +63,8 @@ export interface WeatherData {
   };
   marineHorizonDate?: string;
   isMock?: boolean;
+  clarity?: ClarityResult;
+  lightToday?: DayLightSummary;
 }
 
 function generateMockData(lat: number, lon: number, locationName: string): WeatherData {
@@ -90,6 +95,7 @@ function generateMockData(lat: number, lon: number, locationName: string): Weath
   const visibility: number[] = [];
   const surfacePressure: number[] = [];
   const uvIndex: number[] = [];
+  const shortwave: number[] = [];
 
   for (let i = 0; i < 360; i++) {
     const t = new Date(now.getTime() + i * 3600000);
@@ -109,6 +115,8 @@ function generateMockData(lat: number, lon: number, locationName: string): Weath
     visibility.push(Math.max(1000, 20000 - cc * 150));
     surfacePressure.push(Math.round(1013 + Math.sin(i * 0.05) * 8));
     uvIndex.push(Math.max(0, Math.round(4 + Math.sin((i % 24 - 13) * 0.4) * 4)));
+    const hourOfDay = i % 24;
+    shortwave.push(Math.max(0, Math.round(700 * Math.sin(Math.max(0, (hourOfDay - 6) / 12 * Math.PI)))));
     if (i < 168) {
       marineTimes.push(t.toISOString().slice(0, 16));
       const wh = +(0.4 + Math.sin(i / 20) * 0.3 + Math.random() * 0.2).toFixed(2);
@@ -161,6 +169,7 @@ function generateMockData(lat: number, lon: number, locationName: string): Weath
       visibility,
       surface_pressure: surfacePressure,
       uv_index: uvIndex,
+      shortwave_radiation: shortwave,
     },
     daily: { sunrise: sunrises, sunset: sunsets },
     marineHorizonDate: marineTimes[marineTimes.length - 1] ?? new Date().toISOString(),
@@ -198,7 +207,7 @@ export async function fetchWeather(lat: number, lon: number, locationName: strin
           latitude: lat,
           longitude: lon,
           current: 'temperature_2m,windspeed_10m,winddirection_10m,weathercode,precipitation,windgusts_10m',
-          hourly: 'temperature_2m,windspeed_10m,windgusts_10m,winddirection_10m,precipitation,weathercode,apparent_temperature,cloudcover,precipitation_probability,visibility,surface_pressure,uv_index',
+          hourly: 'temperature_2m,windspeed_10m,windgusts_10m,winddirection_10m,precipitation,weathercode,apparent_temperature,cloudcover,precipitation_probability,visibility,surface_pressure,uv_index,shortwave_radiation',
           daily: 'sunrise,sunset',
           forecast_days: 16,
           wind_speed_unit: 'kn',
@@ -241,6 +250,21 @@ export async function fetchWeather(lat: number, lon: number, locationName: strin
       marineHorizonDate: marineRes.data.hourly.time[marineRes.data.hourly.time.length - 1] ?? new Date().toISOString(),
       location: { lat, lon, name: locationName },
     };
+
+    // Clarté et lumière (best-effort — ne bloque pas si échec)
+    try {
+      const now   = new Date();
+      const month = now.getMonth() + 1;
+      const waveH  = marineRes.data.hourly.wave_height   as number[];
+      const waveT  = marineRes.data.hourly.wave_period   as number[];
+      const clarity = await computeClarity(month, waveH, waveT);
+      data.clarity = clarity;
+
+      const todayStr = now.toISOString().slice(0, 10);
+      const rads: number[]  = weatherRes.data.hourly.shortwave_radiation ?? [];
+      const times: string[] = weatherRes.data.hourly.time ?? [];
+      data.lightToday = computeDayLight(lat, lon, todayStr, rads, times, clarity.kdTotal);
+    } catch { /* dégrade silencieusement */ }
 
     cache.set(cacheKey, data);
     return data;

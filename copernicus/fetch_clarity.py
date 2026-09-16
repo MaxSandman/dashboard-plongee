@@ -39,10 +39,10 @@ from pathlib import Path
 LAT = 49.2796
 LON = -0.2602
 
-DATASET_ID = None  # découvert automatiquement depuis le catalogue CMEMS
+DATASET_ID = "cmems_obs-oc_atl_bgc-transp_nrt_l3-multi-1km_P1D"
 VARIABLES  = ["KD490", "ZSD"]
 
-# Termes de recherche pour identifier le bon dataset dans le catalogue
+# Termes de recherche pour identifier le bon dataset dans le catalogue (fallback si DATASET_ID échoue)
 DATASET_SEARCH_TERMS = ["transp", "atl", "nrt", "l3"]
 
 OUTPUT_DEFAULT = Path(__file__).parent.parent / "data" / "copernicus.json"
@@ -88,7 +88,7 @@ def discover_dataset_id(cm) -> str:
 discover_dataset_id._cache = None
 
 
-def fetch_latest_point(cm, days_back: int = 3):
+def fetch_latest_point(cm, days_back: int = 7):
     """
     Télécharge KD490 et ZSD pour le point le plus proche d'Ouistreham.
     Remonte jusqu'à days_back jours pour trouver une valeur valide (nuages).
@@ -96,7 +96,12 @@ def fetch_latest_point(cm, days_back: int = 3):
     Retourne un dict {date, kd490, zsd, source} ou None si indisponible.
     """
     today = datetime.now(timezone.utc).date()
-    dataset_id = discover_dataset_id(cm)
+    try:
+        dataset_id = DATASET_ID or discover_dataset_id(cm)
+        # Vérification rapide que le dataset existe
+        cm.describe(dataset_id=dataset_id)
+    except Exception:
+        dataset_id = discover_dataset_id(cm)
 
     for delta in range(days_back):
         target_date = today - timedelta(days=delta)
@@ -159,7 +164,7 @@ def main():
     result = fetch_latest_point(cm)
 
     if result is None:
-        print("Aucune donnée satellite disponible pour les 3 derniers jours.", file=sys.stderr)
+        print(f"Aucune donnée satellite disponible pour les {7} derniers jours (nuages).", file=sys.stderr)
         # On conserve le fichier existant s'il existe
         if args.output.exists():
             print("Fichier existant conservé.")

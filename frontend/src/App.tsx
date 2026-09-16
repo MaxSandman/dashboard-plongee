@@ -8,6 +8,7 @@ import EquipmentWidget from './components/EquipmentWidget';
 import DiveDecisionBanner from './components/DiveDecisionBanner';
 import DiveSitesWidget from './components/DiveSitesWidget';
 import MethodePage from './components/MethodePage';
+import DiveReturnForm, { type DiveForecastSnapshot } from './components/DiveReturnForm';
 import { UnitProvider, useUnits } from './contexts/UnitContext';
 import { SiteAdjustmentProvider } from './contexts/SiteAdjustmentContext';
 import { ClarityProvider } from './contexts/ClarityContext';
@@ -17,6 +18,7 @@ import InfoHint from './components/InfoHint';
 import { computeDayDivabilityScore } from './utils/divabilityPerDay';
 import { computeDivability } from './utils/scoring';
 import { forecastReliability } from './utils/forecastReliability';
+import { precipToVisibility } from './utils/precipToVisibility';
 
 interface TideExtreme {
   time: string;
@@ -421,6 +423,29 @@ const AppInner: React.FC = () => {
   const dayTides = tideData[selectedDay] ?? null;
   const marineHorizonDate = weather?.marineHorizonDate ?? null;
 
+  // Formulaire retour de plongée
+  const [showDiveReturn, setShowDiveReturn] = React.useState(false);
+
+  // Snapshot de la prévision pour le jour sélectionné (stocké avec le retour)
+  const selectedDayForecast = React.useMemo((): DiveForecastSnapshot | null => {
+    if (!weather || !selectedDate) return null;
+    const targetTime = selectedDate + 'T12:00:00';
+    const targetHour = new Date(targetTime).toISOString().slice(0, 13);
+    const hourIdx = weather.hourly.time.findIndex((t: string) => t >= targetHour);
+    const idx = hourIdx >= 0 ? hourIdx : 0;
+    const precipitationMmh = weather.hourly.precipitation[idx] ?? 0;
+    const windKnots = weather.hourly.windspeed_10m[idx] ?? 0;
+    const r = computeDivability({ windKnots, waveHeight: 0, precipitation: precipitationMmh, seaTemp: 12, currentMs: 0 });
+    const clarityDetail = r.details.find((d) => d.label === 'Clarté estimée');
+    return {
+      precipitationMmh,
+      windKnots,
+      clarityScore: clarityDetail?.score ?? 0,
+      clarityMaxPts: clarityDetail?.maxPts ?? 20,
+      predictedVisibilityProxy: precipToVisibility(precipitationMmh),
+    };
+  }, [weather, selectedDate]);
+
   // Score du jour sélectionné pour la page Méthode
   const selectedDayScore = React.useMemo(() => {
     if (!weather) return null;
@@ -812,6 +837,20 @@ const AppInner: React.FC = () => {
       {activeView === 'dashboard' ? (
         <main className="max-w-screen-2xl mx-auto px-4 py-6">
 
+          {/* Bouton retour de plongée — jours passés uniquement */}
+          {selectedDate && selectedDate < new Date().toISOString().slice(0, 10) && (
+            <div className="flex justify-end mb-3">
+              <button
+                type="button"
+                onClick={() => setShowDiveReturn(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-ocean-600/20 border border-ocean-500/40 text-ocean-300 text-sm font-medium hover:bg-ocean-600/30 transition-colors"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                Retour de plongée
+              </button>
+            </div>
+          )}
+
           {/* Row 1: Banner + Divability side by side, compact */}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4">
             <div className="lg:col-span-2">
@@ -863,6 +902,17 @@ const AppInner: React.FC = () => {
             marineHorizonDate={marineHorizonDate}
           />
         </main>
+      )}
+
+      {/* Modal retour de plongée */}
+      {showDiveReturn && selectedDate && (
+        <DiveReturnForm
+          date={selectedDate}
+          siteName={location.name}
+          forecast={selectedDayForecast}
+          onClose={() => setShowDiveReturn(false)}
+          onSaved={() => {}}
+        />
       )}
 
       <footer className="text-center py-6 text-gray-600 text-xs">

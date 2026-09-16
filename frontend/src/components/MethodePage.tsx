@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
 import {
   SCORING_WEIGHTS,
   WIND_THRESHOLDS,
@@ -66,6 +67,168 @@ function buildReliabilityRows(): Array<{ dayRange: string; pct: number; label: s
   }
   return rows;
 }
+
+interface DiveReturn {
+  id: string;
+  date: string;
+  site: string;
+  submittedAt: string;
+  observedVisibilityM: number;
+  diveDepthM: number;
+  lampDepthM: number | null;
+  forecast: {
+    precipitationMmh: number;
+    windKnots: number;
+    clarityScore: number;
+    clarityMaxPts: number;
+    predictedVisibilityProxy: number;
+  };
+}
+
+const CalibrationSection: React.FC = () => {
+  const [returns, setReturns] = useState<DiveReturn[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const load = async () => {
+    try {
+      const res = await axios.get('/api/dive-returns');
+      setReturns(res.data);
+    } catch {
+      // silencieux — pas de données terrain n'est pas une erreur
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Supprimer ce retour de plongée ?')) return;
+    setDeleting(id);
+    try {
+      await axios.delete(`/api/dive-returns/${id}`);
+      setReturns((r) => r.filter((e) => e.id !== id));
+    } catch {
+      // silencieux
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  // Statistiques — disponibles dès 5 saisies
+  const stats = returns.length >= 5 ? (() => {
+    const errors = returns.map((r) => r.observedVisibilityM - r.forecast.predictedVisibilityProxy);
+    const mae = errors.reduce((s, e) => s + Math.abs(e), 0) / errors.length;
+    const me  = errors.reduce((s, e) => s + e, 0) / errors.length;
+    const withLamp = returns.filter((r) => r.lampDepthM != null);
+    const meanLampDepth = withLamp.length
+      ? withLamp.reduce((s, r) => s + (r.lampDepthM ?? 0), 0) / withLamp.length
+      : null;
+    return { mae, me, meanLampDepth, n: returns.length };
+  })() : null;
+
+  return (
+    <section id="calibration">
+      <h2 className="text-sm font-semibold text-ocean-400 uppercase tracking-wide mb-3">
+        Calibration terrain
+      </h2>
+      <div className="bg-navy-900 border border-navy-700 rounded-xl p-4 space-y-4">
+        <p className="text-xs text-gray-500">
+          Chaque retour de plongée enregistré depuis un jour passé est stocké ici avec la prévision
+          en vigueur à ce moment. L'écart entre prévision et réalité servira à mesurer et affiner
+          la fiabilité du modèle de clarté.
+          {returns.length < 5 && (
+            <span className="text-amber-500/70"> ({5 - returns.length} saisie{5 - returns.length > 1 ? 's' : ''} supplémentaire{5 - returns.length > 1 ? 's' : ''} avant affichage des statistiques.)</span>
+          )}
+        </p>
+
+        {/* Statistiques (≥ 5 saisies) */}
+        {stats && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="bg-navy-800 rounded-lg p-3 text-center">
+              <p className="text-xs text-gray-500 mb-1">Écart moyen absolu</p>
+              <p className="text-xl font-bold text-white">{stats.mae.toFixed(1)} m</p>
+              <p className="text-xs text-gray-600">sur {stats.n} plongées</p>
+            </div>
+            <div className="bg-navy-800 rounded-lg p-3 text-center">
+              <p className="text-xs text-gray-500 mb-1">Biais systématique</p>
+              <p className="text-xl font-bold" style={{ color: stats.me >= 0 ? '#2dd4bf' : '#f97316' }}>
+                {stats.me >= 0 ? '+' : ''}{stats.me.toFixed(1)} m
+              </p>
+              <p className="text-xs text-gray-600">{stats.me >= 0 ? 'modèle sous-estime' : 'modèle sur-estime'}</p>
+            </div>
+            {stats.meanLampDepth !== null && (
+              <div className="bg-navy-800 rounded-lg p-3 text-center col-span-2 sm:col-span-1">
+                <p className="text-xs text-gray-500 mb-1">Seuil lampe moyen</p>
+                <p className="text-xl font-bold text-white">{stats.meanLampDepth.toFixed(1)} m</p>
+                <p className="text-xs text-gray-600">sur {returns.filter((r) => r.lampDepthM != null).length} plongées</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Journal des saisies */}
+        {loading ? (
+          <p className="text-xs text-gray-600 animate-pulse">Chargement…</p>
+        ) : returns.length === 0 ? (
+          <p className="text-xs text-gray-600 italic">
+            Aucun retour enregistré. Sélectionne un jour passé sur le tableau de bord pour saisir le premier.
+          </p>
+        ) : (
+          <div className="overflow-x-auto -mx-4 px-4">
+            <table className="w-full text-xs min-w-[480px]">
+              <thead>
+                <tr className="text-gray-600 uppercase tracking-wide border-b border-navy-700">
+                  <th className="pb-2 text-left">Date</th>
+                  <th className="pb-2 text-left">Site</th>
+                  <th className="pb-2 text-right">Visi réelle</th>
+                  <th className="pb-2 text-right">Visi prévue</th>
+                  <th className="pb-2 text-right">Écart</th>
+                  <th className="pb-2 text-right">Lampe</th>
+                  <th className="pb-2 text-right">Profondeur</th>
+                  <th className="pb-2" />
+                </tr>
+              </thead>
+              <tbody>
+                {[...returns].sort((a, b) => b.date.localeCompare(a.date)).map((r) => {
+                  const gap = r.observedVisibilityM - r.forecast.predictedVisibilityProxy;
+                  const gapColor = Math.abs(gap) <= 2 ? '#2dd4bf' : Math.abs(gap) <= 5 ? '#f59e0b' : '#ef4444';
+                  return (
+                    <tr key={r.id} className="border-t border-navy-800/60">
+                      <td className="py-2 text-gray-400">{r.date}</td>
+                      <td className="py-2 text-gray-400 max-w-[120px] truncate">{r.site}</td>
+                      <td className="py-2 text-right font-mono text-white">{r.observedVisibilityM} m</td>
+                      <td className="py-2 text-right font-mono text-gray-500">~{r.forecast.predictedVisibilityProxy} m</td>
+                      <td className="py-2 text-right font-mono font-semibold" style={{ color: gapColor }}>
+                        {gap >= 0 ? '+' : ''}{gap.toFixed(1)} m
+                      </td>
+                      <td className="py-2 text-right text-gray-500">
+                        {r.lampDepthM != null ? `${r.lampDepthM} m` : '—'}
+                      </td>
+                      <td className="py-2 text-right text-gray-500">{r.diveDepthM} m</td>
+                      <td className="py-2 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(r.id)}
+                          disabled={deleting === r.id}
+                          className="text-gray-700 hover:text-red-400 transition-colors disabled:opacity-40 text-xs"
+                          aria-label="Supprimer"
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+};
 
 const MethodePage: React.FC<Props> = ({
   selectedDayScore,
@@ -466,6 +629,9 @@ const MethodePage: React.FC<Props> = ({
           ))}
         </div>
       </section>
+
+      {/* Calibration terrain */}
+      <CalibrationSection />
 
       {/* Limites du modèle */}
       <section id="limites">

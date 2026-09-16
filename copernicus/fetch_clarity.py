@@ -39,8 +39,11 @@ from pathlib import Path
 LAT = 49.2796
 LON = -0.2602
 
-DATASET_ID = "cmems_obs-oc_atl_bgc-transp_nrt_l3-olci-300m_P1D"
+DATASET_ID = None  # découvert automatiquement depuis le catalogue CMEMS
 VARIABLES  = ["KD490", "ZSD"]
+
+# Termes de recherche pour identifier le bon dataset dans le catalogue
+DATASET_SEARCH_TERMS = ["transp", "atl", "nrt", "l3"]
 
 OUTPUT_DEFAULT = Path(__file__).parent.parent / "data" / "copernicus.json"
 
@@ -58,6 +61,33 @@ def load_copernicusmarine():
         sys.exit(1)
 
 
+def discover_dataset_id(cm) -> str:
+    """Trouve le dataset CMEMS NRT L3 Atlantic avec KD490/ZSD."""
+    cached_id = discover_dataset_id._cache
+    if cached_id:
+        return cached_id
+
+    desc = cm.describe(contains=DATASET_SEARCH_TERMS)
+    for product in desc.products:
+        for dataset in product.datasets:
+            did = dataset.dataset_id.lower()
+            # On cherche un dataset L3 NRT Atlantic avec transparence
+            if all(t in did for t in ["atl", "nrt", "transp"]):
+                print(f"  Dataset trouvé : {dataset.dataset_id}")
+                discover_dataset_id._cache = dataset.dataset_id
+                return dataset.dataset_id
+
+    # Fallback : lister tous les datasets trouvés pour debug
+    print("Datasets disponibles (filtrés) :", file=sys.stderr)
+    for product in desc.products:
+        for dataset in product.datasets:
+            if "atl" in dataset.dataset_id.lower() and "oc" in dataset.dataset_id.lower():
+                print(f"  {dataset.dataset_id}", file=sys.stderr)
+    raise RuntimeError("Aucun dataset KD490/ZSD NRT L3 Atlantic trouvé dans le catalogue CMEMS")
+
+discover_dataset_id._cache = None
+
+
 def fetch_latest_point(cm, days_back: int = 3):
     """
     Télécharge KD490 et ZSD pour le point le plus proche d'Ouistreham.
@@ -66,12 +96,14 @@ def fetch_latest_point(cm, days_back: int = 3):
     Retourne un dict {date, kd490, zsd, source} ou None si indisponible.
     """
     today = datetime.now(timezone.utc).date()
+    dataset_id = discover_dataset_id(cm)
+
     for delta in range(days_back):
         target_date = today - timedelta(days=delta)
         date_str = target_date.isoformat()
         try:
             ds = cm.open_dataset(
-                dataset_id=DATASET_ID,
+                dataset_id=dataset_id,
                 variables=VARIABLES,
                 minimum_longitude=LON - 0.1,
                 maximum_longitude=LON + 0.1,

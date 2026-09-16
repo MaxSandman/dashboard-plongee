@@ -683,6 +683,12 @@ const AppInner: React.FC = () => {
 
                   const isToday = i === 0;
 
+                  // Indicateur lumière : lampe si ciel très couvert + clarté bloquante
+                  const noonCloudCover = noonIdx >= 0 ? (weather?.hourly?.cloudcover?.[noonIdx] ?? 0) : 0;
+                  const clarityDetail = dayScore?.details.find((d) => d.label === 'Clarté estimée');
+                  const needsLamp = noonCloudCover > 80 && clarityDetail?.score === 0;
+                  const dimLight  = noonCloudCover > 60 && (clarityDetail?.score ?? 20) < 10;
+
                   return (
                     <button
                       key={d.date}
@@ -709,9 +715,13 @@ const AppInner: React.FC = () => {
                         <p className={`text-xs font-semibold ${isSelected ? 'text-ocean-300' : 'text-gray-400'}`}>
                           {isToday ? "Auj." : formatDayTab(d.date)}
                         </p>
-                        <span className="text-xs" style={{ color: beyondMarine ? '#4b5563' : getCoefficientColor(d.coefficient) }}>
-                          {d.coefficientIsEstimate ? '~' : ''}C{d.coefficient}
-                        </span>
+                        <div className="flex items-center gap-1">
+                          {needsLamp && <span title="Lampe probablement nécessaire" className="text-[10px]">🔦</span>}
+                          {!needsLamp && dimLight && <span title="Luminosité réduite" className="text-[10px]">🌫</span>}
+                          <span className="text-xs" style={{ color: beyondMarine ? '#4b5563' : getCoefficientColor(d.coefficient) }}>
+                            {d.coefficientIsEstimate ? '~' : ''}C{d.coefficient}
+                          </span>
+                        </div>
                       </div>
 
                       {/* ── Collapsible details ── */}

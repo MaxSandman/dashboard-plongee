@@ -45,6 +45,20 @@ interface WeatherData {
   };
   daily: { sunrise: string[]; sunset: string[] };
   location: { lat: number; lon: number; name: string };
+  clarity?: {
+    kdTotal: number;
+    visibilityM: number;
+    confidence: 'high' | 'medium' | 'low';
+    orneDebitM3s: number | null;
+    copernicus: { date: string; kd490: number; zsd: number; visibilityM: number; daysBack: number } | null;
+  };
+  lightToday?: {
+    maxReadableDepthM: number;
+    lampRequiredAfterUtc: string | null;
+    refDepthM: number;
+    noonLux: number;
+    lightQuality: 'bright' | 'dim' | 'dark';
+  };
 }
 
 interface TidalImpact {
@@ -284,6 +298,55 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
           {selectedSite && (
             <p className="text-xs text-ocean-400/70 mb-3 italic">Ajusté pour {selectedSite.name}<InfoHint hintId="siteAdjustment" /></p>
           )}
+
+          {/* Bandeau lumière */}
+          {weather?.lightToday && (() => {
+            const lt = weather.lightToday!;
+            const cl = weather.clarity;
+            const lampTime = lt.lampRequiredAfterUtc
+              ? new Date(lt.lampRequiredAfterUtc).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' })
+              : null;
+            const qualColor = lt.lightQuality === 'bright' ? '#2dd4bf' : lt.lightQuality === 'dim' ? '#f59e0b' : '#ef4444';
+            const qualLabel = lt.lightQuality === 'bright' ? 'Bonne luminosité' : lt.lightQuality === 'dim' ? 'Luminosité réduite' : 'Sombre';
+            return (
+              <div
+                className="w-full rounded-lg p-3 mb-3 text-xs"
+                style={{ backgroundColor: qualColor + '15', border: `1px solid ${qualColor}40` }}
+              >
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span style={{ color: qualColor }}>💡</span>
+                  <span className="font-semibold" style={{ color: qualColor }}>{qualLabel}</span>
+                  {cl && (
+                    <span className="ml-auto text-gray-500">
+                      {cl.confidence === 'high' ? '🛰 satellite' : cl.confidence === 'medium' ? '🌊 modèle' : '📊 climatologie'}
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-gray-400">
+                  <span>Lisible jusqu'à</span>
+                  <span className="font-medium text-white">{lt.maxReadableDepthM} m</span>
+                  {cl && (
+                    <>
+                      <span>Visibilité estimée</span>
+                      <span className="font-medium text-white">{cl.visibilityM.toFixed(1)} m</span>
+                    </>
+                  )}
+                  {lampTime && (
+                    <>
+                      <span>Lampe requise après</span>
+                      <span className="font-medium text-amber-400">{lampTime}</span>
+                    </>
+                  )}
+                  {!lampTime && lt.lightQuality !== 'dark' && (
+                    <>
+                      <span>Lampe</span>
+                      <span className="font-medium text-teal-400">Non requise</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Score breakdown */}
           <div className="w-full grid grid-cols-2 gap-x-4 gap-y-2">

@@ -10,6 +10,7 @@ export function computeDayDivabilityScore(
   date: string,
   weather: any,
   marineHorizonDate: string | null,
+  clarityEnabled = true,
 ): DayDivabilityScore {
   const isPartial = marineHorizonDate
     ? new Date(date + 'T12:00:00') > new Date(marineHorizonDate)
@@ -25,7 +26,7 @@ export function computeDayDivabilityScore(
   if (isPartial) {
     return computeDivability(
       { windKnots, waveHeight: 0, precipitation, seaTemp: 0, currentMs: 0 },
-      { isPartial: true },
+      { isPartial: true, clarityEnabled },
     );
   }
 
@@ -38,6 +39,6 @@ export function computeDayDivabilityScore(
 
   return computeDivability(
     { windKnots, waveHeight, precipitation, seaTemp, currentMs },
-    { isPartial: false },
+    { isPartial: false, clarityEnabled },
   );
 }

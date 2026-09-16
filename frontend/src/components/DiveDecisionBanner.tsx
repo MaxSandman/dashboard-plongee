@@ -3,6 +3,7 @@ import { AlertTriangle } from 'lucide-react';
 import InfoHint from './InfoHint';
 import { useUnits } from '../contexts/UnitContext';
 import { computeDivability } from '../utils/scoring';
+import { useClarity } from '../contexts/ClarityContext';
 
 /**
  * ALGORITHME DE DÉCISION — Meilleure fenêtre de plongée du jour
@@ -95,6 +96,7 @@ function computeEtaleWindows(
   extremes: TideExtreme[],
   weather: WeatherData,
   dayIndex: number,
+  clarityEnabled = true,
 ): EtaleWindow[] {
   const sunrise = new Date(weather.daily.sunrise[dayIndex] ?? weather.daily.sunrise[0]);
   const sunset  = new Date(weather.daily.sunset[dayIndex]  ?? weather.daily.sunset[0]);
@@ -118,7 +120,7 @@ function computeEtaleWindows(
       precipitation,
       seaTemp: 12, // température non disponible à l'heure de l'étale dans cette interface — valeur neutre
       currentMs,
-    });
+    }, { clarityEnabled });
 
     // Le classement des créneaux ajoute un bonus diurne pour favoriser les plongées de jour,
     // sans que ce bonus n'affecte le verdict affiché.
@@ -159,6 +161,7 @@ interface Props {
 
 const DiveDecisionBanner: React.FC<Props> = ({ selectedDay, tideData, weather, marineHorizonDate }) => {
   const { formatWind } = useUnits();
+  const { clarityEnabled } = useClarity();
   if (!weather || tideData.length === 0) return null;
 
   const day = tideData[selectedDay];
@@ -178,7 +181,7 @@ const DiveDecisionBanner: React.FC<Props> = ({ selectedDay, tideData, weather, m
     );
   }
 
-  const windows = computeEtaleWindows(day.extremes, weather, selectedDay);
+  const windows = computeEtaleWindows(day.extremes, weather, selectedDay, clarityEnabled);
   const best    = windows.length > 0 ? windows.reduce((a, b) => (b.rankingScore > a.rankingScore ? b : a)) : null;
 
   return (

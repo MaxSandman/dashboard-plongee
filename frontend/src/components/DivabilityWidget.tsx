@@ -8,6 +8,7 @@ import SectionTitle from './SectionTitle';
 import InfoHint from './InfoHint';
 import { forecastReliability } from '../utils/forecastReliability';
 import { computeDivability, type DivabilityResult } from '../utils/scoring';
+import { useClarity } from '../contexts/ClarityContext';
 
 interface WeatherData {
   current: {
@@ -63,6 +64,7 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
   const { formatWind, formatTemp } = useUnits();
   const { selectedSite } = useSiteAdjustment();
   const multipliers = getSiteMultipliers(selectedSite);
+  const { clarityEnabled, setClarityEnabled } = useClarity();
   const [tidalImpact, setTidalImpact] = useState<TidalImpact | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -125,10 +127,10 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
 
     const result = computeDivability(
       { windKnots, waveHeight, precipitation, seaTemp, currentMs },
-      { multipliers, formatWind, formatTemp },
+      { multipliers, clarityEnabled, formatWind, formatTemp },
     );
     setScore({ ...result, total: result.score });
-  }, [weather, tidalImpact, selectedDate, multipliers]);
+  }, [weather, tidalImpact, selectedDate, multipliers, clarityEnabled]);
 
   const dayIndex = React.useMemo(() => {
     if (!selectedDate) return 0;
@@ -257,6 +259,27 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
             </div>
             <span className="text-xs font-medium" style={{ color: reliability.color }}>{reliability.label} ({reliability.pct}%)</span>
           </div>
+
+          {/* Toggle clarté */}
+          <label className="flex items-center gap-2 cursor-pointer mb-3 select-none">
+            <div className="relative shrink-0">
+              <input
+                type="checkbox"
+                className="sr-only"
+                checked={clarityEnabled}
+                onChange={(e) => setClarityEnabled(e.target.checked)}
+              />
+              <div
+                className="w-8 h-4 rounded-full transition-colors"
+                style={{ backgroundColor: clarityEnabled ? '#0e7490' : '#374151' }}
+              />
+              <div
+                className="absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-all"
+                style={{ left: clarityEnabled ? '18px' : '2px' }}
+              />
+            </div>
+            <span className="text-xs text-gray-500">Clarté dans le score</span>
+          </label>
 
           {selectedSite && (
             <p className="text-xs text-ocean-400/70 mb-3 italic">Ajusté pour {selectedSite.name}<InfoHint hintId="siteAdjustment" /></p>

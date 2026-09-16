@@ -152,6 +152,12 @@ export interface ScoringOptions {
    */
   isPartial?: boolean;
   /**
+   * Prise en compte de la clarté estimée dans le score (défaut : true).
+   * Si false, la clarté reçoit son score maximum — utile pour les sites
+   * où les précipitations de surface ne corrèlent pas avec la visibilité.
+   */
+  clarityEnabled?: boolean;
+  /**
    * Multiplicateurs d'exposition du site (valeur > 1 → pénalise davantage).
    * La valeur brute est divisée par le multiplicateur avant scoring.
    */
@@ -201,12 +207,15 @@ export function computeDivability(
 ): DivabilityResult {
   const {
     isPartial = false,
+    clarityEnabled = true,
     multipliers = { wind: 1, swell: 1, current: 1 },
     formatWind = (kt: number) => `${Math.round(kt)} kt`,
     formatTemp = (c: number) => `${Math.round(c)}°C`,
   } = options;
 
-  const { windKnots, waveHeight, precipitation, seaTemp, currentMs } = conditions;
+  const { windKnots, waveHeight, seaTemp, currentMs } = conditions;
+  // Quand la clarté est désactivée, on force précip = 0 → score clarté maximum.
+  const precipitation = clarityEnabled ? conditions.precipitation : 0;
 
   const effectiveWind    = windKnots  / (multipliers.wind    ?? 1);
   const effectiveWaves   = waveHeight / (multipliers.swell   ?? 1);

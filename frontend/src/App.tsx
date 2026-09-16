@@ -11,7 +11,7 @@ import MethodePage from './components/MethodePage';
 import DiveReturnForm, { type DiveForecastSnapshot } from './components/DiveReturnForm';
 import { UnitProvider, useUnits } from './contexts/UnitContext';
 import { SiteAdjustmentProvider } from './contexts/SiteAdjustmentContext';
-import { ClarityProvider } from './contexts/ClarityContext';
+import { ClarityProvider, useClarity } from './contexts/ClarityContext';
 import { useDiveSites } from './hooks/useDiveSites';
 import UnitSelector from './components/UnitSelector';
 import InfoHint from './components/InfoHint';
@@ -205,6 +205,7 @@ const MobileSection: React.FC<{ label: string; children: React.ReactNode }> = ({
 const AppInner: React.FC = () => {
   const { selectedSite } = useDiveSites();
   const { formatWind, formatTemp } = useUnits();
+  const { clarityEnabled } = useClarity();
 
   // ── Theme (light/dark) ───────────────────────────────────────────────────
   const [isDark, setIsDark] = React.useState<boolean>(() => {
@@ -451,8 +452,8 @@ const AppInner: React.FC = () => {
     if (!weather) return null;
     const date = selectedDate || tideData[0]?.date || '';
     if (!date) return null;
-    return computeDayDivabilityScore(date, weather, marineHorizonDate);
-  }, [weather, selectedDate, marineHorizonDate, tideData]);
+    return computeDayDivabilityScore(date, weather, marineHorizonDate, clarityEnabled);
+  }, [weather, selectedDate, marineHorizonDate, tideData, clarityEnabled]);
 
   return (
     <ClarityProvider>
@@ -666,7 +667,7 @@ const AppInner: React.FC = () => {
                   const isSelected = selectedDay === i;
 
                   // Per-day divability score
-                  const dayScore = weather ? computeDayDivabilityScore(d.date, weather, marineHorizonDate) : null;
+                  const dayScore = weather ? computeDayDivabilityScore(d.date, weather, marineHorizonDate, clarityEnabled) : null;
                   const noonNorm = dayScore ? Math.round((dayScore.score / dayScore.maxPossible) * 100) : null;
                   const bestWindow = (!beyondMarine && weather && d.extremes.length)
                     ? computeBestWindowScore(d.extremes, weather)

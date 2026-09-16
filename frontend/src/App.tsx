@@ -7,8 +7,10 @@ import ClubDivesWidget from './components/ClubDivesWidget';
 import EquipmentWidget from './components/EquipmentWidget';
 import DiveDecisionBanner from './components/DiveDecisionBanner';
 import DiveSitesWidget from './components/DiveSitesWidget';
+import MethodePage from './components/MethodePage';
 import { UnitProvider, useUnits } from './contexts/UnitContext';
 import { SiteAdjustmentProvider } from './contexts/SiteAdjustmentContext';
+import { ClarityProvider } from './contexts/ClarityContext';
 import { useDiveSites } from './hooks/useDiveSites';
 import UnitSelector from './components/UnitSelector';
 import { computeDayDivabilityScore } from './utils/divabilityPerDay';
@@ -193,6 +195,9 @@ const AppInner: React.FC = () => {
   const [tidesLoading, setTidesLoading] = React.useState(true);
   const [tidesError, setTidesError] = React.useState<string | null>(null);
 
+  // ── Onglets de navigation ────────────────────────────────────────────────
+  const [activeView, setActiveView] = React.useState<'dashboard' | 'methode'>('dashboard');
+
   // ── Compact day bar ──────────────────────────────────────────────────────
   const [barIsCompact, setBarIsCompact] = React.useState(false);
   const [barHovered, setBarHovered] = React.useState(false);
@@ -370,7 +375,16 @@ const AppInner: React.FC = () => {
   const dayTides = tideData[selectedDay] ?? null;
   const marineHorizonDate = weather?.marineHorizonDate ?? null;
 
+  // Score du jour sélectionné pour la page Méthode
+  const selectedDayScore = React.useMemo(() => {
+    if (!weather) return null;
+    const date = selectedDate || tideData[0]?.date || '';
+    if (!date) return null;
+    return computeDayDivabilityScore(date, weather, marineHorizonDate);
+  }, [weather, selectedDate, marineHorizonDate, tideData]);
+
   return (
+    <ClarityProvider>
     <SiteAdjustmentProvider selectedSite={selectedSite}>
     <div className="min-h-screen">
       {/* Header */}
@@ -527,6 +541,30 @@ const AppInner: React.FC = () => {
 
         {/* Decorative line */}
         <div className="h-0.5 bg-gradient-to-r from-transparent via-ocean-400 to-transparent opacity-30" />
+
+        {/* Navigation onglets */}
+        <div className="max-w-screen-2xl mx-auto px-4 pt-2 flex gap-1">
+          <button
+            onClick={() => setActiveView('dashboard')}
+            className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+              activeView === 'dashboard'
+                ? 'bg-ocean-600/30 text-ocean-300 border border-ocean-500/40'
+                : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            Tableau de bord
+          </button>
+          <button
+            onClick={() => setActiveView('methode')}
+            className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+              activeView === 'methode'
+                ? 'bg-ocean-600/30 text-ocean-300 border border-ocean-500/40'
+                : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            Méthode
+          </button>
+        </div>
 
         {/* Row 2: Rich day bar */}
         <div className="max-w-screen-2xl mx-auto px-4 py-2">
@@ -723,44 +761,55 @@ const AppInner: React.FC = () => {
       </header>
 
       {/* Main content */}
-      <main className="max-w-screen-2xl mx-auto px-4 py-6">
+      {activeView === 'dashboard' ? (
+        <main className="max-w-screen-2xl mx-auto px-4 py-6">
 
-        {/* Row 1: Banner + Divability side by side, compact */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4">
-          <div className="lg:col-span-2">
-            <DiveDecisionBanner selectedDay={selectedDay} tideData={tideData} weather={weather} marineHorizonDate={marineHorizonDate} />
+          {/* Row 1: Banner + Divability side by side, compact */}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4">
+            <div className="lg:col-span-2">
+              <DiveDecisionBanner selectedDay={selectedDay} tideData={tideData} weather={weather} marineHorizonDate={marineHorizonDate} />
+            </div>
+            <div className="lg:col-span-3">
+              <DivabilityWidget selectedDate={selectedDate} weather={weather} marineHorizonDate={marineHorizonDate} />
+            </div>
           </div>
-          <div className="lg:col-span-3">
-            <DivabilityWidget selectedDate={selectedDate} weather={weather} marineHorizonDate={marineHorizonDate} />
-          </div>
-        </div>
 
-        {/* Row 2: HourlyDetailView full width */}
-        <div className="mb-4">
-          <HourlyDetailView
-            weather={weather}
-            weatherLoading={weatherLoading}
-            weatherError={weatherError}
-            onRetry={fetchWeather}
-            selectedDay={selectedDay}
-            location={location}
-            dayTides={dayTides}
+          {/* Row 2: HourlyDetailView full width */}
+          <div className="mb-4">
+            <HourlyDetailView
+              weather={weather}
+              weatherLoading={weatherLoading}
+              weatherError={weatherError}
+              onRetry={fetchWeather}
+              selectedDay={selectedDay}
+              location={location}
+              dayTides={dayTides}
+              marineHorizonDate={marineHorizonDate}
+            />
+          </div>
+
+          {/* Row 3: Tides full width */}
+          <div className="mb-4">
+            <TidesWidget selectedDay={selectedDay} tideData={tideData} tidesLoading={tidesLoading} tidesError={tidesError} onRetry={fetchTides} weather={weather} locationName={location.name} />
+          </div>
+
+          {/* Row 4: Club + Equipment + DiveSites */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <ClubDivesWidget />
+            <EquipmentWidget />
+            <DiveSitesWidget />
+          </div>
+        </main>
+      ) : (
+        <main className="max-w-screen-2xl mx-auto px-4 py-6">
+          <MethodePage
+            selectedDayScore={selectedDayScore}
+            selectedDate={selectedDate}
+            selectedDayIndex={selectedDay}
             marineHorizonDate={marineHorizonDate}
           />
-        </div>
-
-        {/* Row 3: Tides full width */}
-        <div className="mb-4">
-          <TidesWidget selectedDay={selectedDay} tideData={tideData} tidesLoading={tidesLoading} tidesError={tidesError} onRetry={fetchTides} weather={weather} locationName={location.name} />
-        </div>
-
-        {/* Row 4: Club + Equipment + DiveSites */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <ClubDivesWidget />
-          <EquipmentWidget />
-          <DiveSitesWidget />
-        </div>
-      </main>
+        </main>
+      )}
 
       <footer className="text-center py-6 text-gray-600 text-xs">
         Dashboard Plongée — Ouistreham, Normandie &nbsp;•&nbsp; Données: Open-Meteo, prédiction harmonique SHOM
@@ -860,6 +909,7 @@ const AppInner: React.FC = () => {
       )}
     </div>
     </SiteAdjustmentProvider>
+    </ClarityProvider>
   );
 };
 

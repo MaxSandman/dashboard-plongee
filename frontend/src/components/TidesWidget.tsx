@@ -451,7 +451,36 @@ const TidesWidget: React.FC<Props> = ({
             Tableau des marées
             <InfoHint hintId="tidalRange" />
           </p>
-          <div className="overflow-x-auto rounded-lg border border-navy-700 mb-4">
+          {/* Vue mobile — liste de cartes (< sm) */}
+          <div className="flex flex-col gap-2 mb-4 sm:hidden">
+            {tableRows.map(({ ext, marnage }, i) => (
+              <div
+                key={i}
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 border border-navy-700 ${
+                  ext.type === 'high' ? 'bg-ocean-500/5' : 'bg-navy-900/50'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 shrink-0 w-10">
+                  {ext.type === 'high' ? (
+                    <TrendingUp size={13} className="text-ocean-400" />
+                  ) : (
+                    <TrendingDown size={13} className="text-gray-400" />
+                  )}
+                  <span className={`text-xs font-semibold ${ext.type === 'high' ? 'text-ocean-300' : 'text-gray-400'}`}>
+                    {ext.type === 'high' ? 'PM' : 'BM'}
+                  </span>
+                </div>
+                <span className="text-sm font-mono text-gray-300 shrink-0">{formatTime(ext.time)}</span>
+                <span className="text-sm font-mono font-bold text-white">{ext.height.toFixed(2)} m</span>
+                {marnage != null && (
+                  <span className="text-xs text-gray-500 ml-auto">marnage {marnage.toFixed(2)} m</span>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Vue desktop — tableau (sm+) */}
+          <div className="hidden sm:block overflow-x-auto rounded-lg border border-navy-700 mb-4">
             <table className="w-full text-xs">
               <thead>
                 <tr className="bg-navy-900 text-gray-500 uppercase tracking-wide">

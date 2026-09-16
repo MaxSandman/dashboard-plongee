@@ -226,18 +226,23 @@ const DiveDecisionBanner: React.FC<Props> = ({ selectedDay, tideData, weather, m
             return (
               <div
                 key={i}
-                className={`flex items-center gap-2 rounded-lg px-2 py-1 text-xs ${
+                className={`rounded-lg px-2 py-1.5 text-xs ${
                   isBest ? 'bg-ocean-900/30 border border-ocean-400/30' : 'bg-navy-900/60'
                 }`}
               >
-                <span className="font-medium text-gray-300 shrink-0">
-                  {w.extremeType === 'high' ? 'PM' : 'BM'}
-                </span>
-                <span className="text-gray-400 shrink-0">{formatTime(w.extremeTime)}</span>
-                <span className="text-gray-600 shrink-0">{formatTime(w.windowStart)}–{formatTime(w.windowEnd)}</span>
-                <span className="shrink-0 text-gray-500">{formatWind(w.wind)} · {w.waves.toFixed(1)} m</span>
-                {!w.isDaylight && <span className="text-xs text-amber-500 shrink-0">🌙</span>}
-                <span className="ml-auto font-semibold shrink-0" style={{ color: w.verdictColor }}>{w.verdict}</span>
+                {/* Ligne 1 : type · heure étale · verdict */}
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-gray-300 shrink-0">
+                    {w.extremeType === 'high' ? 'PM' : 'BM'}
+                  </span>
+                  <span className="text-gray-400 shrink-0">{formatTime(w.extremeTime)}</span>
+                  {!w.isDaylight && <span className="text-amber-500 shrink-0">🌙</span>}
+                  <span className="ml-auto font-semibold shrink-0" style={{ color: w.verdictColor }}>{w.verdict}</span>
+                </div>
+                {/* Ligne 2 : fenêtre · conditions */}
+                <div className="text-gray-500 mt-0.5">
+                  {formatTime(w.windowStart)}–{formatTime(w.windowEnd)} · {formatWind(w.wind)} · {w.waves.toFixed(1)} m
+                </div>
               </div>
             );
           })}

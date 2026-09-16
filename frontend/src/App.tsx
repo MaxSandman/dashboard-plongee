@@ -174,6 +174,32 @@ async function fetchSuggestions(input: string): Promise<GeoSuggestion[]> {
   return suggestions.slice(0, 6);
 }
 
+/** Blocs secondaires repliés par défaut sur mobile, toujours visibles sur desktop. */
+const MobileSection: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => {
+  const [open, setOpen] = React.useState(false);
+  const [isLg, setIsLg] = React.useState(() => typeof window !== 'undefined' && window.innerWidth >= 1024);
+  React.useEffect(() => {
+    const h = () => setIsLg(window.innerWidth >= 1024);
+    window.addEventListener('resize', h, { passive: true });
+    return () => window.removeEventListener('resize', h);
+  }, []);
+  if (isLg) return <>{children}</>;
+  return (
+    <div className="rounded-xl border border-navy-700 bg-navy-800/50 overflow-hidden">
+      <button
+        type="button"
+        className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-ocean-400"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        <span>{label}</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? 'rotate(180deg)' : '', transition: 'transform 200ms' }}><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      {open && <div className="border-t border-navy-700">{children}</div>}
+    </div>
+  );
+};
+
 const AppInner: React.FC = () => {
   const { selectedSite } = useDiveSites();
   const { formatWind, formatTemp } = useUnits();
@@ -228,6 +254,10 @@ const AppInner: React.FC = () => {
 
   const barExpanded = !barIsCompact || barHovered || barTapped;
   const [selectedDay, setSelectedDay] = React.useState(0);
+  const selectedCardRef = React.useRef<HTMLButtonElement>(null);
+  React.useEffect(() => {
+    selectedCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+  }, [selectedDay]);
   const [location, setLocation] = React.useState(DEFAULT_LOCATION);
   const [weather, setWeather] = React.useState<any>(null);
   const [weatherLoading, setWeatherLoading] = React.useState(true);
@@ -595,7 +625,7 @@ const AppInner: React.FC = () => {
             <>
               <div
                 className="flex gap-2 overflow-x-auto pb-1"
-                style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x' } as React.CSSProperties}
+                style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x', scrollSnapType: 'x mandatory' } as React.CSSProperties}
                 onMouseEnter={() => setBarHovered(true)}
                 onMouseLeave={() => setBarHovered(false)}
                 onClick={() => {
@@ -630,6 +660,7 @@ const AppInner: React.FC = () => {
                   return (
                     <button
                       key={d.date}
+                      ref={isSelected ? selectedCardRef : undefined}
                       onClick={() => setSelectedDay(i)}
                       title={`Fiabilité prévision : ${forecastReliability(i).label} (${forecastReliability(i).pct}%)`}
                       className={`relative rounded-xl px-3 py-2 text-left transition-all duration-150 ${
@@ -641,6 +672,7 @@ const AppInner: React.FC = () => {
                       }`}
                       style={{
                         flexShrink: 0, minWidth: '108px',
+                        scrollSnapAlign: 'start',
                         ...(dayScore?.isPartial && !isSelected ? {
                           backgroundImage: 'repeating-linear-gradient(-45deg, rgba(245,158,11,0.06) 0px, rgba(245,158,11,0.06) 3px, transparent 3px, transparent 10px)',
                         } : {}),
@@ -809,11 +841,17 @@ const AppInner: React.FC = () => {
             <TidesWidget selectedDay={selectedDay} tideData={tideData} tidesLoading={tidesLoading} tidesError={tidesError} onRetry={fetchTides} weather={weather} locationName={location.name} />
           </div>
 
-          {/* Row 4: Club + Equipment + DiveSites */}
+          {/* Row 4: Club + Equipment + DiveSites — repliés par défaut sur mobile */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <ClubDivesWidget />
-            <EquipmentWidget />
-            <DiveSitesWidget />
+            <MobileSection label="Sorties club">
+              <ClubDivesWidget />
+            </MobileSection>
+            <MobileSection label="Équipement">
+              <EquipmentWidget />
+            </MobileSection>
+            <MobileSection label="Sites de plongée">
+              <DiveSitesWidget />
+            </MobileSection>
           </div>
         </main>
       ) : (

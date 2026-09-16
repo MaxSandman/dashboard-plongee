@@ -266,8 +266,9 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
           <div className="w-full grid grid-cols-2 gap-x-4 gap-y-2">
             {score.details.map((d) => {
               const pct = (d.score / d.maxPts) * 100;
-              const barColor = d.score >= d.maxPts * 0.7 ? '#2dd4bf' : d.score >= d.maxPts * 0.4 ? '#f59e0b' : '#ef4444';
-              const qualLabel = d.score >= d.maxPts * 0.7 ? 'Favorable' : d.score >= d.maxPts * 0.4 ? 'Moyen' : 'Défavorable';
+              // Rouge uniquement si le facteur est bloquant (0 pt), sinon ambre ou teal
+              const barColor = d.score === 0 ? '#ef4444' : d.score >= d.maxPts * 0.7 ? '#2dd4bf' : '#f59e0b';
+              const qualLabel = d.score === 0 ? 'Bloquant' : d.score >= d.maxPts * 0.7 ? 'Favorable' : 'Moyen';
               const labelTooltip: Record<string, string> = {
                 'Clarté estimée': "Proxy basé sur les précipitations en surface. Ne reflète pas directement la visibilité sous l'eau, qui dépend aussi de la turbidité et des sédiments.",
                 'Courant': "Vitesse du courant océanique de surface. À l'étale (renverse), le courant est quasi nul pendant ~30 à 90 minutes.",
@@ -282,7 +283,7 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
                     </span>
                     <span className="text-xs shrink-0" style={{ color: barColor }}>{d.value}</span>
                   </div>
-                  <div className="h-2 bg-navy-900 rounded-full overflow-hidden" title={`${d.score}/${d.maxPts} pts — ${qualLabel}`}>
+                  <div className="h-1.5 bg-navy-900 rounded-full overflow-hidden" title={`${d.score}/${d.maxPts} pts — ${qualLabel}`}>
                     <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: barColor }} />
                   </div>
                   {d.note && <p className="text-xs text-amber-500/70 mt-0.5 italic truncate">{d.note}</p>}

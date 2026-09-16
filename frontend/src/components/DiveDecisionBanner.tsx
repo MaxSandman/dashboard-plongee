@@ -1,6 +1,6 @@
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
-import InfoTooltip from './InfoTooltip';
+import InfoHint from './InfoHint';
 import { useUnits } from '../contexts/UnitContext';
 import { computeDivability } from '../utils/scoring';
 
@@ -191,7 +191,7 @@ const DiveDecisionBanner: React.FC<Props> = ({ selectedDay, tideData, weather, m
             <div className="flex items-center gap-2 mb-1">
               <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center">
                 Meilleur créneau du jour
-                <InfoTooltip text="L'étale est la période de renverse du courant autour d'une pleine mer ou basse mer. Le courant est minimal pendant ±45 min autour de l'heure exacte — idéal pour plonger." />
+                <InfoHint hintId="bestWindow" />
               </span>
               {!best.isDaylight && <span className="text-xs text-amber-500">⚠️ hors jour</span>}
             </div>

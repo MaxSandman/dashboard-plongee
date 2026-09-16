@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Package, Plus, Trash2, Check, ShoppingCart, RefreshCw, Pencil, X } from 'lucide-react';
+import SectionTitle from './SectionTitle';
 
 interface EquipmentItem {
   id: string;
@@ -90,10 +91,11 @@ const EquipmentWidget: React.FC = () => {
 
   return (
     <div className="card">
-      <div className="card-header">
-        <Package size={18} className="text-ocean-400" />
-        <span>Équipement</span>
-      </div>
+      <SectionTitle
+        icon={<Package size={18} className="text-ocean-400" />}
+        title="Équipement"
+        hintId="equipment"
+      />
 
       {/* Summary */}
       <div className="grid grid-cols-3 gap-2 mb-4">

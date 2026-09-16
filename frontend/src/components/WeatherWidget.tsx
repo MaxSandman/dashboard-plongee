@@ -2,6 +2,8 @@ import React from 'react';
 import { Wind, Waves, AlertTriangle } from 'lucide-react';
 import { useUnits } from '../contexts/UnitContext';
 import InfoTooltip from './InfoTooltip';
+import SectionTitle from './SectionTitle';
+import InfoHint from './InfoHint';
 
 interface WeatherData {
   current: {
@@ -212,11 +214,13 @@ const WeatherWidget: React.FC<Props> = ({
 
   return (
     <div className="card">
-      <div className="card-header">
-        <Waves size={18} className="text-ocean-400" />
-        <span>Météo Marine</span>
+      <SectionTitle
+        icon={<Waves size={18} className="text-ocean-400" />}
+        title="Météo Marine"
+        hintId="marineWeather"
+      >
         <span className="ml-auto text-sm font-normal text-gray-400">{location.name}</span>
-      </div>
+      </SectionTitle>
 
       {weatherLoading && (
         <div className="flex items-center justify-center h-32 text-gray-500">
@@ -275,7 +279,7 @@ const WeatherWidget: React.FC<Props> = ({
             <div className="grid grid-cols-2 gap-3 mb-3">
               {/* Swell */}
               <div className="bg-navy-900 rounded-lg p-3">
-                <p className="text-xs text-gray-500 mb-1 flex items-center">Houle<InfoTooltip text="La houle est une vague de longue période formée loin du site par le vent. Elle est distincte de la mer de vent locale. Une forte houle peut rendre la mise à l'eau difficile même par vent calme." /></p>
+                <p className="text-xs text-gray-500 mb-1 flex items-center">Houle<InfoHint hintId="waveVsSwell" /></p>
                 <p className="text-lg font-bold text-white">{marine.swellHeight.toFixed(1)} m</p>
                 <p className="text-xs text-gray-400">{marine.swellPeriod.toFixed(0)}s · {windDirectionLabel(marine.swellDirection)}</p>
                 <p className="text-xs mt-0.5" style={{ color: waveExposure(marine.swellDirection).color }}>
@@ -284,7 +288,7 @@ const WeatherWidget: React.FC<Props> = ({
               </div>
               {/* Wind sea */}
               <div className="bg-navy-900 rounded-lg p-3">
-                <p className="text-xs text-gray-500 mb-1 flex items-center">Mer de vent<InfoTooltip text="La mer de vent (ou 'wind sea') est formée localement par le vent actuel. Elle est plus courte et chaotique que la houle. En Manche, elle peut s'élever rapidement en cas de coup de vent." /></p>
+                <p className="text-xs text-gray-500 mb-1 flex items-center">Mer de vent</p>
                 <p className="text-lg font-bold text-white">{marine.windWaveHeight.toFixed(1)} m</p>
                 <p className="text-xs text-gray-400">{windDirectionLabel(marine.windWaveDirection)}</p>
                 <p className="text-xs mt-0.5" style={{ color: waveExposure(marine.windWaveDirection).color }}>

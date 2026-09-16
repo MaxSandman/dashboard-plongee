@@ -13,6 +13,7 @@ import { SiteAdjustmentProvider } from './contexts/SiteAdjustmentContext';
 import { ClarityProvider } from './contexts/ClarityContext';
 import { useDiveSites } from './hooks/useDiveSites';
 import UnitSelector from './components/UnitSelector';
+import InfoHint from './components/InfoHint';
 import { computeDayDivabilityScore } from './utils/divabilityPerDay';
 import { computeDivability } from './utils/scoring';
 import { forecastReliability } from './utils/forecastReliability';
@@ -331,6 +332,21 @@ const AppInner: React.FC = () => {
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // Écoute l'événement custom émis par InfoHint pour basculer sur l'onglet Méthode
+  React.useEffect(() => {
+    const handler = (e: Event) => {
+      const anchor = (e as CustomEvent).detail as string;
+      setActiveView('methode');
+      // Scroll vers l'ancre après le rendu de la page Méthode
+      setTimeout(() => {
+        const el = document.querySelector(anchor);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    };
+    window.addEventListener('open-methode', handler);
+    return () => window.removeEventListener('open-methode', handler);
   }, []);
 
   const handleSearchInput = (value: string) => {
@@ -741,7 +757,7 @@ const AppInner: React.FC = () => {
                   transition: 'max-height 240ms ease, opacity 200ms ease',
                 }}
               >
-                <span>Score /100 à midi · Étale = meilleur créneau du jour</span>
+                <span className="flex items-center">Score /100 à midi · Étale = meilleur créneau du jour<InfoHint hintId="dayBar" /></span>
                 {tideData.some((d) => isDayBeyondMarine(d.date, marineHorizonDate)) && (
                   <span className="text-amber-700/70">≈ Estimation = vent+pluie seuls (données marines indisponibles au-delà de ~7j)</span>
                 )}

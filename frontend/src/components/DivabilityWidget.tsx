@@ -4,6 +4,8 @@ import { Target } from 'lucide-react';
 import { useUnits } from '../contexts/UnitContext';
 import { useSiteAdjustment, getSiteMultipliers } from '../contexts/SiteAdjustmentContext';
 import InfoTooltip from './InfoTooltip';
+import SectionTitle from './SectionTitle';
+import InfoHint from './InfoHint';
 import { forecastReliability } from '../utils/forecastReliability';
 import { computeDivability, type DivabilityResult } from '../utils/scoring';
 
@@ -147,11 +149,11 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
 
   return (
     <div className="card">
-      <div className="card-header">
-        <Target size={18} className="text-ocean-400" />
-        <span>Indice de Plongeabilité</span>
-        <InfoTooltip text="Score de 0 à 100 combinant vent, vagues, clarté, température de l'eau et courant. 80+ = excellentes conditions, en dessous de 40 = déconseillé." />
-      </div>
+      <SectionTitle
+        icon={<Target size={18} className="text-ocean-400" />}
+        title="Indice de Plongeabilité"
+        hintId="divabilityIndex"
+      />
 
       {loading && (
         <div className="flex items-center justify-center h-32 text-gray-500 animate-pulse">
@@ -249,7 +251,7 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
             {score.verdict}
           </div>
           <div className="flex items-center gap-2 mb-4">
-            <span className="text-xs text-gray-500">Fiabilité prévision :</span>
+            <span className="text-xs text-gray-500 flex items-center">Fiabilité prévision :<InfoHint hintId="reliability" /></span>
             <div className="flex-1 max-w-24 h-1.5 rounded-full bg-navy-800 overflow-hidden">
               <div className="h-full rounded-full transition-all" style={{ width: `${reliability.pct}%`, backgroundColor: reliability.color }} />
             </div>
@@ -257,7 +259,7 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
           </div>
 
           {selectedSite && (
-            <p className="text-xs text-ocean-400/70 mb-3 italic">Ajusté pour {selectedSite.name}</p>
+            <p className="text-xs text-ocean-400/70 mb-3 italic">Ajusté pour {selectedSite.name}<InfoHint hintId="siteAdjustment" /></p>
           )}
 
           {/* Score breakdown */}

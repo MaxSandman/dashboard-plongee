@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { MapPin, Plus, Trash2, ChevronUp, Check, Wind, Waves, Navigation } from 'lucide-react';
+import SectionTitle from './SectionTitle';
 import { useDiveSites, type DiveSite } from '../hooks/useDiveSites';
 
 const EXPOSURE_LABELS: Record<string, string> = { low: 'Faible', medium: 'Modérée', high: 'Élevée' };
@@ -29,13 +30,15 @@ const DiveSitesWidget: React.FC = () => {
 
   return (
     <div className="card">
-      <div className="card-header">
-        <MapPin size={18} className="text-ocean-400" />
-        <span>Sites de Plongée</span>
+      <SectionTitle
+        icon={<MapPin size={18} className="text-ocean-400" />}
+        title="Sites de Plongée"
+        hintId="diveSites"
+      >
         {selectedSite && (
           <span className="ml-auto text-xs text-ocean-400">{selectedSite.name}</span>
         )}
-      </div>
+      </SectionTitle>
 
       {/* Site list */}
       <div className="space-y-2 mb-4">

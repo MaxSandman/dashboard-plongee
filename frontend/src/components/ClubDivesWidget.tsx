@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Upload, X, Calendar } from 'lucide-react';
+import SectionTitle from './SectionTitle';
 import { parseIcs, type IcsEvent } from '../utils/parseIcs';
 
 interface ClubDive {
@@ -68,9 +69,11 @@ const ClubDivesWidget: React.FC = () => {
 
   return (
     <div className="card">
-      <div className="card-header">
-        <span>🤿</span>
-        <span>Sorties du Club</span>
+      <SectionTitle
+        icon={<span>🤿</span>}
+        title="Sorties du Club"
+        hintId="clubDives"
+      >
         <button
           className="ml-auto btn-ghost text-xs"
           onClick={() => fetchDives(true)}
@@ -78,7 +81,7 @@ const ClubDivesWidget: React.FC = () => {
         >
           {refreshing ? '⟳ ...' : '⟳ Rafraîchir'}
         </button>
-      </div>
+      </SectionTitle>
 
       {/* iCal import section */}
       <div className="mb-4">

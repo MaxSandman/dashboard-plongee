@@ -12,6 +12,8 @@ import {
 } from 'recharts';
 import { Waves, TrendingUp, TrendingDown, Sunrise, Sunset } from 'lucide-react';
 import InfoTooltip from './InfoTooltip';
+import SectionTitle from './SectionTitle';
+import InfoHint from './InfoHint';
 
 // ─── Interfaces ────────────────────────────────────────────────────────────────
 
@@ -368,9 +370,11 @@ const TidesWidget: React.FC<Props> = ({
   return (
     <div className="card">
       {/* ── Header ── */}
-      <div className="card-header">
-        <Waves size={18} className="text-ocean-400" />
-        <span>Marées — {locationName ?? 'Ouistreham'}</span>
+      <SectionTitle
+        icon={<Waves size={18} className="text-ocean-400" />}
+        title={`Marées — ${locationName ?? 'Ouistreham'}`}
+        hintId="tides"
+      >
         {currentDay && (
           <span
             className="ml-auto text-sm font-normal"
@@ -385,7 +389,7 @@ const TidesWidget: React.FC<Props> = ({
             )}
           </span>
         )}
-      </div>
+      </SectionTitle>
 
       {/* ── Loading ── */}
       {tidesLoading && (
@@ -445,7 +449,7 @@ const TidesWidget: React.FC<Props> = ({
           {/* ─────────────────────────────────────────────────────────────────── */}
           <p className="text-xs uppercase tracking-wide text-gray-500 mb-2 flex items-center gap-1">
             Tableau des marées
-            <InfoTooltip text="PM = Pleine Mer (haute mer), BM = Basse Mer. Le marnage est la différence de hauteur entre deux étales consécutives. La durée indique le temps entre chaque étale." />
+            <InfoHint hintId="tidalRange" />
           </p>
           <div className="overflow-x-auto rounded-lg border border-navy-700 mb-4">
             <table className="w-full text-xs">
@@ -721,7 +725,7 @@ const TidesWidget: React.FC<Props> = ({
             <div className="flex justify-between text-xs text-gray-400 mb-1">
               <span className="flex items-center gap-1">
                 Coefficient estimé
-                <InfoTooltip text="Le coefficient de marée (20 à 120) mesure l'amplitude. En dessous de 70 : morte-eau (faibles courants). Au-dessus de 95 : vive-eau (forts courants, grande amplitude). Valeur estimée — consultez maree.shom.fr pour le coefficient officiel." />
+                <InfoHint hintId="coefficient" />
                 :{' '}
                 <strong style={{ color: getCoefficientColor(currentDay.coefficient) }}>
                   ~{currentDay.coefficient}

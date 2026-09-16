@@ -78,7 +78,7 @@ def fetch_latest_point(cm, days_back: int = 3):
                 minimum_latitude=LAT - 0.1,
                 maximum_latitude=LAT + 0.1,
                 start_datetime=f"{date_str}T00:00:00",
-                stop_datetime=f"{date_str}T23:59:59",
+                end_datetime=f"{date_str}T23:59:59",
             )
 
             # Extraire le pixel le plus proche

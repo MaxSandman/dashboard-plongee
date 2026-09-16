@@ -109,7 +109,7 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
   }, [selectedDate, fetchTidalImpact]);
 
   useEffect(() => {
-    if (!weather || !tidalImpact) return;
+    if (!weather) return;
 
     let windKnots: number;
     let waveHeight: number;
@@ -144,7 +144,7 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
       { multipliers, clarityEnabled, formatWind, formatTemp },
     );
     setScore({ ...result, total: result.score });
-  }, [weather, tidalImpact, selectedDate, multipliers, clarityEnabled]);
+  }, [weather, selectedDate, multipliers, clarityEnabled]);
 
   const dayIndex = React.useMemo(() => {
     if (!selectedDate) return 0;

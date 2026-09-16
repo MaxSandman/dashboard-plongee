@@ -12,6 +12,7 @@ import { SiteAdjustmentProvider } from './contexts/SiteAdjustmentContext';
 import { useDiveSites } from './hooks/useDiveSites';
 import UnitSelector from './components/UnitSelector';
 import { computeDayDivabilityScore } from './utils/divabilityPerDay';
+import { computeDivability } from './utils/scoring';
 import { forecastReliability } from './utils/forecastReliability';
 
 interface TideExtreme {
@@ -49,6 +50,30 @@ function getCoefficientColor(coeff: number): string {
   if (coeff <= 90) return '#f59e0b';
   if (coeff <= 100) return '#f97316';
   return '#ef4444';
+}
+
+function getHourlyVal(times: string[], values: number[], target: Date): number {
+  const h = target.toISOString().slice(0, 13);
+  const idx = times.findIndex((t) => t.slice(0, 13) >= h);
+  return idx >= 0 ? (values[idx] ?? 0) : 0;
+}
+
+function computeBestWindowScore(extremes: TideExtreme[], weather: any): number | null {
+  if (!extremes.length || !weather) return null;
+  const MARGIN = 45 * 60 * 1000;
+  let best = -1;
+  for (const ext of extremes) {
+    const t = new Date(ext.time);
+    const wind  = getHourlyVal(weather.hourly?.time ?? [], weather.hourly?.windspeed_10m ?? [], t);
+    const precip = getHourlyVal(weather.hourly?.time ?? [], weather.hourly?.precipitation ?? [], t);
+    const waves  = getHourlyVal(weather.marine?.hourly?.time ?? [], weather.marine?.hourly?.wave_height ?? [], t);
+    const current = getHourlyVal(weather.marine?.hourly?.time ?? [], weather.marine?.hourly?.ocean_current_velocity ?? [], t);
+    const seaTemp = getHourlyVal(weather.marine?.hourly?.time ?? [], weather.marine?.hourly?.sea_surface_temperature ?? [], t) || 12;
+    void MARGIN;
+    const r = computeDivability({ windKnots: wind, waveHeight: waves, precipitation: precip, seaTemp, currentMs: current });
+    if (r.score > best) best = r.score;
+  }
+  return best >= 0 ? best : null;
 }
 
 function isDayBeyondMarine(date: string, marineHorizonDate: string | null): boolean {
@@ -533,6 +558,13 @@ const AppInner: React.FC = () => {
 
                   // Per-day divability score
                   const dayScore = weather ? computeDayDivabilityScore(d.date, weather, marineHorizonDate) : null;
+                  const noonNorm = dayScore ? Math.round((dayScore.score / dayScore.maxPossible) * 100) : null;
+                  const bestWindow = (!beyondMarine && weather && d.extremes.length)
+                    ? computeBestWindowScore(d.extremes, weather)
+                    : null;
+                  const windowGain = (bestWindow !== null && noonNorm !== null && bestWindow - noonNorm > 5)
+                    ? bestWindow - noonNorm
+                    : null;
 
                   // Air temp at noon
                   const noonStr = d.date + 'T12';
@@ -545,13 +577,20 @@ const AppInner: React.FC = () => {
                     <button
                       key={d.date}
                       onClick={() => setSelectedDay(i)}
-                      style={{ flexShrink: 0, minWidth: '108px' }}
                       title={`Fiabilité prévision : ${forecastReliability(i).label} (${forecastReliability(i).pct}%)`}
                       className={`relative rounded-xl px-3 py-2 text-left transition-all duration-150 ${
                         isSelected
-                          ? 'bg-ocean-600/40 border border-ocean-400/60 shadow-lg shadow-ocean-900/30'
-                          : 'bg-navy-900/80 border border-navy-700/60 hover:border-navy-500'
-                      } ${beyondMarine ? 'opacity-70' : ''}`}
+                          ? 'bg-ocean-600/40 border-2 border-ocean-400/60 shadow-lg shadow-ocean-900/30'
+                          : dayScore?.isPartial
+                            ? 'bg-navy-900/80 border-2 border-dashed border-amber-500/70 hover:border-amber-400/90'
+                            : 'bg-navy-900/80 border border-navy-700/60 hover:border-navy-500'
+                      }`}
+                      style={{
+                        flexShrink: 0, minWidth: '108px',
+                        ...(dayScore?.isPartial && !isSelected ? {
+                          backgroundImage: 'repeating-linear-gradient(-45deg, rgba(245,158,11,0.06) 0px, rgba(245,158,11,0.06) 3px, transparent 3px, transparent 10px)',
+                        } : {}),
+                      }}
                     >
                       {/* ── Always visible: date + coefficient ── */}
                       <div className="flex items-center justify-between">
@@ -573,23 +612,47 @@ const AppInner: React.FC = () => {
                         }}
                       >
                         {/* Divability score */}
-                        {dayScore ? (
+                        {dayScore && noonNorm !== null ? (
                           <>
-                            <div className="flex items-baseline gap-1 mt-1 mb-0.5">
-                              <span className="text-lg font-bold leading-none" style={{ color: dayScore.verdictColor }}>
-                                {dayScore.score}
+                            {dayScore.isPartial && (
+                              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-400 bg-amber-500/15 border border-amber-500/50 rounded px-1 py-px mt-1 mb-1">
+                                ≈ Estimation
                               </span>
-                              <span className="text-xs text-gray-600">/{dayScore.maxPossible}</span>
+                            )}
+                            {/* Score midi */}
+                            <div className="flex items-baseline gap-0.5 mt-0.5">
+                              <span className="text-[9px] text-gray-600 mr-0.5">Midi</span>
+                              <span className="text-lg font-bold leading-none" style={{ color: dayScore.verdictColor }}>
+                                {noonNorm}
+                              </span>
+                              <span className="text-xs text-gray-600">/100</span>
                             </div>
-                            <p className="text-xs font-medium mb-1" style={{ color: dayScore.verdictColor }}>
-                              {dayScore.verdict}{dayScore.isPartial ? '*' : ''}
+                            {/* Score meilleur créneau */}
+                            {bestWindow !== null && (
+                              <div className="flex items-baseline gap-0.5">
+                                <span className="text-[9px] text-gray-600 mr-0.5">Étale</span>
+                                <span className="text-sm font-bold leading-none" style={{ color: dayScore.verdictColor }}>
+                                  {bestWindow}
+                                </span>
+                                <span className="text-[10px] text-gray-600">/100</span>
+                              </div>
+                            )}
+                            {/* Gain chip */}
+                            {windowGain !== null && (
+                              <span className="inline-block text-[9px] text-emerald-400 bg-emerald-400/10 border border-emerald-400/25 rounded-full px-1.5 py-px mt-0.5 mb-0.5">
+                                +{windowGain} pts à l'étale
+                              </span>
+                            )}
+                            <p className="text-[10px] font-semibold mt-0.5 mb-1" style={{ color: dayScore.verdictColor }}>
+                              {dayScore.verdict}
                             </p>
                             <div className="h-1 rounded-full bg-navy-700 mb-1 overflow-hidden">
                               <div
                                 className="h-full rounded-full"
                                 style={{
-                                  width: `${(dayScore.score / dayScore.maxPossible) * 100}%`,
+                                  width: `${noonNorm}%`,
                                   backgroundColor: dayScore.verdictColor,
+                                  opacity: dayScore.isPartial ? 0.65 : 1,
                                 }}
                               />
                             </div>
@@ -640,9 +703,9 @@ const AppInner: React.FC = () => {
                   transition: 'max-height 240ms ease, opacity 200ms ease',
                 }}
               >
-                <span>Score /100 (indice de plongeabilité à midi)</span>
+                <span>Score /100 à midi · Étale = meilleur créneau du jour</span>
                 {tideData.some((d) => isDayBeyondMarine(d.date, marineHorizonDate)) && (
-                  <span className="text-gray-700">* score partiel /45 (au-delà de ~7j, météo seule)</span>
+                  <span className="text-amber-700/70">≈ Estimation = vent+pluie seuls (données marines indisponibles au-delà de ~7j)</span>
                 )}
                 {tideData.some((d) => d.coefficientIsEstimate) && (
                   <span className="text-amber-700/70">~C coefficient estimé — <a href="https://maree.shom.fr" target="_blank" rel="noopener noreferrer" className="underline">valeur officielle SHOM</a></span>

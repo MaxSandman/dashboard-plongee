@@ -192,6 +192,24 @@ function generateMockData(lat: number, lon: number, locationName: string): Weath
     },
     location: { lat, lon, name: locationName },
     isMock: true,
+    clarity: {
+      kdTotal: 0.25,
+      kdBaseline: 0.12,
+      kdRiver: 0.04,
+      kdWave: 0.05,
+      kdPlancton: 0.04,
+      visibilityM: +(2.04 / 0.25).toFixed(1),
+      confidence: 'low' as const,
+      orneDebitM3s: null,
+      copernicus: null,
+    },
+    lightToday: {
+      maxReadableDepthM: 18,
+      lampRequiredAfterUtc: null,
+      refDepthM: 15,
+      noonLux: 12000,
+      lightQuality: 'bright' as const,
+    },
   };
 }
 

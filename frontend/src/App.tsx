@@ -521,7 +521,7 @@ const AppInner: React.FC = () => {
 
           {/* Units + theme + clock */}
           <div className="flex items-center gap-3 shrink-0">
-            <UnitSelector />
+            <UnitSelector /><InfoHint hintId="units" />
             {/* Light/dark toggle */}
             <button
               type="button"

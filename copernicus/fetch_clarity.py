@@ -118,20 +118,32 @@ def fetch_latest_point(cm, days_back: int = 7):
                 end_datetime=f"{date_str}T23:59:59",
             )
 
-            # Extraire le pixel le plus proche
-            ds_point = ds.sel(
-                latitude=LAT,
-                longitude=LON,
-                method="nearest",
-            ).isel(time=0)
-
-            kd490_val = float(ds_point["KD490"].values)
-            zsd_val   = float(ds_point["ZSD"].values)
-
             import math
-            if math.isnan(kd490_val) or math.isnan(zsd_val):
-                print(f"  {date_str} — données NaN (nuages), on recule…")
-                continue
+            import numpy as np
+
+            # Prendre la tranche temporelle disponible
+            da_kd  = ds["KD490"].isel(time=0) if "time" in ds["KD490"].dims else ds["KD490"]
+            da_zsd = ds["ZSD"].isel(time=0)   if "time" in ds["ZSD"].dims   else ds["ZSD"]
+
+            # Pixel le plus proche d'abord
+            pt_kd  = float(da_kd.sel(latitude=LAT,  longitude=LON,  method="nearest").values)
+            pt_zsd = float(da_zsd.sel(latitude=LAT, longitude=LON, method="nearest").values)
+
+            # Si NaN (masque terre ou nuage), chercher le premier pixel valide dans la bbox
+            if math.isnan(pt_kd) or math.isnan(pt_zsd):
+                kd_arr  = da_kd.values.flatten()
+                zsd_arr = da_zsd.values.flatten()
+                valid   = ~(np.isnan(kd_arr) | np.isnan(zsd_arr))
+                if not valid.any():
+                    print(f"  {date_str} — données NaN (nuages ou masque terre), on recule…")
+                    continue
+                # Moyenne des pixels valides dans la bbox
+                pt_kd  = float(np.nanmean(kd_arr))
+                pt_zsd = float(np.nanmean(zsd_arr))
+                print(f"  {date_str} — pixel côtier masqué, moyenne bbox ({valid.sum()} pixels valides)")
+
+            kd490_val = pt_kd
+            zsd_val   = pt_zsd
 
             return {
                 "date":       date_str,

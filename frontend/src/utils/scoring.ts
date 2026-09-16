@@ -71,6 +71,65 @@ function toQuality(
   return           { quality: 'poor',               verdict: 'Annulée',      verdictColor: '#991b1b' };
 }
 
+// ── Tables de seuils exportées (pour la page Méthode) ──────────────────────
+
+/** Interface commune pour les paliers de score avec seuil supérieur exclusif. */
+export interface ScoreThreshold {
+  max: number;   // borne supérieure exclusive (Infinity pour la dernière)
+  pts: number;
+  label: string; // libellé lisible pour la page Méthode
+}
+
+export const WIND_THRESHOLDS: ScoreThreshold[] = [
+  { max: 8,        pts: 25, label: 'Calme (< 8 kt)' },
+  { max: 12,       pts: 20, label: 'Légère brise (8–12 kt)' },
+  { max: 15,       pts: 10, label: 'Brise modérée (12–15 kt)' },
+  { max: 20,       pts: 5,  label: 'Assez fort (15–20 kt)' },
+  { max: Infinity, pts: 0,  label: 'Fort ou tempête (≥ 20 kt)' },
+];
+
+export const WAVE_THRESHOLDS: ScoreThreshold[] = [
+  { max: 0.3,      pts: 30, label: 'Mer plate (< 0,3 m)' },
+  { max: 0.5,      pts: 25, label: 'Très légère (0,3–0,5 m)' },
+  { max: 0.8,      pts: 18, label: 'Légère (0,5–0,8 m)' },
+  { max: 1.2,      pts: 10, label: 'Modérée (0,8–1,2 m)' },
+  { max: 1.5,      pts: 4,  label: 'Forte (1,2–1,5 m)' },
+  { max: Infinity, pts: 0,  label: 'Très forte (≥ 1,5 m)' },
+];
+
+export const CLARITY_THRESHOLDS: ScoreThreshold[] = [
+  { max: 0.01,     pts: 20, label: 'Pas de précip.' },
+  { max: 0.5,      pts: 15, label: 'Traces (< 0,5 mm/h)' },
+  { max: 2,        pts: 8,  label: 'Légère pluie (0,5–2 mm/h)' },
+  { max: 5,        pts: 3,  label: 'Pluie modérée (2–5 mm/h)' },
+  { max: Infinity, pts: 0,  label: 'Pluie forte (≥ 5 mm/h)' },
+];
+
+/** Paliers de température (seuils >=, pour affichage dans la page Méthode uniquement). */
+export const TEMP_THRESHOLDS: Array<{ min: number; pts: number; label: string }> = [
+  { min: 16, pts: 10, label: '≥ 16 °C — eau chaude' },
+  { min: 12, pts: 8,  label: '12–16 °C — correct' },
+  { min: 10, pts: 6,  label: '10–12 °C — frais' },
+  { min: 8,  pts: 4,  label: '8–10 °C — froid' },
+  { min: 0,  pts: 2,  label: '< 8 °C — très froid' },
+];
+
+export const CURRENT_THRESHOLDS: ScoreThreshold[] = [
+  { max: 0.3,      pts: 15, label: 'Quasi nul (< 0,3 m/s)' },
+  { max: 0.6,      pts: 12, label: 'Faible (0,3–0,6 m/s)' },
+  { max: 1.0,      pts: 7,  label: 'Modéré (0,6–1,0 m/s)' },
+  { max: 1.5,      pts: 3,  label: 'Fort (1,0–1,5 m/s)' },
+  { max: Infinity, pts: 0,  label: 'Très fort (≥ 1,5 m/s)' },
+];
+
+export const VERDICT_THRESHOLDS = [
+  { minPct: 0.8, verdict: 'Excellente',   verdictColor: '#2dd4bf' },
+  { minPct: 0.6, verdict: 'Bonne',        verdictColor: '#2dd4bf' },
+  { minPct: 0.4, verdict: 'Moyenne',      verdictColor: '#f59e0b' },
+  { minPct: 0.2, verdict: 'Déconseillée', verdictColor: '#ef4444' },
+  { minPct: 0,   verdict: 'Annulée',      verdictColor: '#991b1b' },
+] as const;
+
 // ── Types publics ───────────────────────────────────────────────────────────
 
 export interface ScoringConditions {
